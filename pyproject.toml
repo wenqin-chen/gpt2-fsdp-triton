@@ -1,0 +1,97 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gpt2-fsdp-triton"
+version = "0.1.0"
+description = "Pretrain GPT-2 (124M) on FineWeb-Edu 10B tokens with PyTorch DDP/FSDP on multiple GPUs, with measured throughput/MFU, HellaSwag eval and a fused Triton kernel."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Wenqin Chen", email = "wenqinchenphy@gmail.com" }]
+requires-python = ">=3.11,<3.13"
+keywords = ["LLM pretraining", "FSDP", "DDP", "Triton", "GPT-2", "FineWeb-Edu", "MFU"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "numpy>=1.26",
+  "tiktoken>=0.8",
+  "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# exactly one torch build: `cpu` (Mac, CI) or `cu130` (cluster GPUs; brings triton)
+cpu = ["torch>=2.8"]
+cu130 = ["torch>=2.8"]
+data = ["huggingface_hub>=0.25", "pyarrow>=17"]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.9",
+  "mypy>=1.13",
+]
+
+[project.scripts]
+gptfsdp = "gptfsdp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/wenqin-chen/gpt2-fsdp-triton"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gptfsdp"]
+
+[tool.uv]
+environments = ["sys_platform == 'darwin'", "sys_platform == 'linux'"]
+conflicts = [[{ extra = "cpu" }, { extra = "cu130" }]]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu130", extra = "cu130", marker = "sys_platform == 'linux'" },
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = '-m "not gpu and not slow"'
+log_level = "WARNING"  # DCP logs every save at DEBUG
+markers = [
+  "gpu: needs a CUDA GPU (Triton kernels, bf16 CUDA paths); run on the cluster with -m gpu",
+  "slow: longer multi-process tests; opt in with -m slow",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["/data/", "/runs/", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gptfsdp"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/gptfsdp"]
+ignore_missing_imports = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+show_error_codes = true

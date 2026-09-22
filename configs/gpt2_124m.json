@@ -1,0 +1,19 @@
+{
+  "preset": "gpt2-small",
+  "data_dir": "data/fineweb_edu_10b",
+  "total_batch_tokens": 524288,
+  "micro_batch": 16,
+  "seq_len": 1024,
+  "max_steps": 19073,
+  "warmup_steps": 715,
+  "max_lr": 0.0006,
+  "min_lr_ratio": 0.1,
+  "weight_decay": 0.1,
+  "grad_clip": 1.0,
+  "bf16": true,
+  "compile": true,
+  "val_every": 250,
+  "val_steps": 20,
+  "ckpt_every": 1000,
+  "ckpt_keep": 2
+}
