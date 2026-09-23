@@ -72,6 +72,7 @@ class TrainConfig:
     val_steps: int = 20
     ckpt_every: int = 1000
     ckpt_keep: int = 2
+    ckpt_final: bool = True  # False for throughput calibration runs (no 1.5 GB final checkpoint)
     resume: str = ""  # a checkpoint directory, or "latest" (this run's newest)
     time_limit_s: float = 0.0  # > 0: checkpoint and stop before this wall-clock budget runs out
 
@@ -254,7 +255,8 @@ def train(cfg: TrainConfig) -> dict[str, Any]:
             log.write(record)
         done = step == cfg.max_steps - 1
         out_of_time = cfg.time_limit_s > 0 and time.perf_counter() - t_start > cfg.time_limit_s
-        if (cfg.ckpt_every and (step + 1) % cfg.ckpt_every == 0) or done or out_of_time:
+        periodic = bool(cfg.ckpt_every) and (step + 1) % cfg.ckpt_every == 0
+        if periodic or (done and cfg.ckpt_final) or out_of_time:
             ckpt.save(
                 ckpt.step_dir(ckpt_root, step + 1), wrapped, optimizer,
                 {"step": step + 1, "loader_shard": train_loader.state.shard,
