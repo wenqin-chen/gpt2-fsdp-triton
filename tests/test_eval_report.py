@@ -95,6 +95,6 @@ def test_report_uses_only_logged_numbers(tmp_path: Path) -> None:
         "`a_8gpu`" in text
         and "3,000,000" in text
         and "30.0%" in text
-        and "0.3010 (n=10042)" in text
+        and "3.2500" in text  # final validation loss (the HellaSwag column was dropped)
     )
     assert "16384 × 768" in text and "2.50×" in text and "do not edit by hand" in text

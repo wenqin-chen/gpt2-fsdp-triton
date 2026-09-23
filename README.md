@@ -5,9 +5,13 @@ Pretraining GPT-2 small (124M parameters) on the FineWeb-Edu 10B-token sample wi
 evaluation, and a fused **Triton LayerNorm** kernel benchmarked against PyTorch eager and
 `torch.compile`.
 
-**Status: under construction.** No training run has been made yet; `RESULTS.md` is generated from
-run logs by `gptfsdp report` and is the only place results will appear. The plan, recipe, metric
-definitions and honesty rules are in [`SPEC.md`](SPEC.md).
+**Status: under construction.** Single-GPU, one-node (DDP, FSDP2) and two-node (FSDP2, 16 H200)
+throughput runs and the Triton kernel benchmark are done; the full one-epoch pretraining run is
+queued. All numbers live in [`RESULTS.md`](RESULTS.md), which `gptfsdp report` generates from the
+run records in `results/runs/` (config, manifest, JSONL log per run) and `bench/*.json` - nothing
+is typed by hand. The plan, recipe, metric definitions and honesty rules are in
+[`SPEC.md`](SPEC.md). HellaSwag was dropped: its upstream repository is blocked by a DMCA notice
+(see SPEC section 3).
 
 ## Layout
 

@@ -9,3 +9,5 @@ __pycache__/
 *.npy
 *.parquet
 .env
+# small run records (config, manifest, JSONL log; never checkpoints) back RESULTS.md
+!/results/
