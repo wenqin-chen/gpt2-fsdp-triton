@@ -86,7 +86,8 @@ class TrainConfig:
 def _git_sha() -> str:
     try:
         out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10,
+            ["git", "describe", "--always", "--dirty", "--abbrev=40"],
+            capture_output=True, text=True, timeout=10,
             cwd=Path(__file__).resolve().parent,
         )  # fmt: skip
         return out.stdout.strip() or "unknown"

@@ -12,4 +12,5 @@
 set -euo pipefail
 cd "${REPO:?set REPO}"
 .venv/bin/python -m pytest -q -m gpu tests/test_kernel_gpu.py
-.venv/bin/python -m gptfsdp.cli bench-layernorm --out "bench/$(date +%Y%m%dT%H%M%S)_layernorm.json"
+.venv/bin/python -m gptfsdp.cli bench-layernorm --label "${LABEL:-}" \
+  --out "bench/$(date +%Y%m%dT%H%M%S)_layernorm${LABEL:+_$LABEL}.json"

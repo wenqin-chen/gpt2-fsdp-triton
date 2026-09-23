@@ -99,6 +99,30 @@ def bench_table(bench: dict[str, Any]) -> str:
     return head + body
 
 
+KEY_SHAPES: tuple[tuple[int, int], ...] = ((16384, 768), (65536, 768))
+
+
+def iterations_table(benches: list[tuple[str, dict[str, Any]]]) -> str:
+    """One row per benchmark file: forward+backward ms at the GPT-2 training shapes."""
+    shape_cols = " | ".join(f"{m} × {n}: Triton / eager / compile (ms)" for m, n in KEY_SHAPES)
+    head = f"| file | variant | git sha | {shape_cols} |\n|" + "---|" * (3 + len(KEY_SHAPES)) + "\n"
+    body = ""
+    for name, bench in benches:
+        by_shape = {(r["M"], r["N"]): r for r in bench["rows"]}
+        cells = []
+        for shape in KEY_SHAPES:
+            r = by_shape.get(shape)
+            if r is None:
+                cells.append("—")
+            else:
+                cells.append(
+                    " / ".join(f"{r[k]['fwd_bwd_ms']:.3f}" for k in ("triton", "eager", "compile"))
+                )
+        sha = str(bench.get("git_sha") or "—")[:7]
+        body += f"| `{name}` | {bench.get('label') or '—'} | {sha} | " + " | ".join(cells) + " |\n"
+    return head + body
+
+
 def write_results(
     runs: str | Path, out: str | Path, bench_dir: str | Path = "bench"
 ) -> dict[str, Any]:
@@ -116,13 +140,16 @@ def write_results(
     if rows:
         sources = sorted({r["peak_source"] for r in rows if r["peak_source"]})
         parts.append("\nMFU peaks: " + "; ".join(sources) + ".\n" if sources else "")
-    benches = sorted(Path(bench_dir).glob("*.json")) if Path(bench_dir).is_dir() else []
+    files = sorted(Path(bench_dir).glob("*.json")) if Path(bench_dir).is_dir() else []
+    benches = [(p.name, json.loads(p.read_text())) for p in files]
     parts.append("\n## Triton LayerNorm benchmark\n\n")
-    parts.append(
-        "".join(bench_table(json.loads(p.read_text())) + "\n" for p in benches)
-        if benches
-        else "_Not run yet._\n"
-    )
+    if benches:
+        name, latest = benches[-1]
+        parts.append(f"Latest: `{name}` ({latest.get('label') or 'unlabelled'}).\n\n")
+        parts.append(bench_table(latest))
+        parts.append("\n### Kernel iterations (forward + backward)\n\n" + iterations_table(benches))
+    else:
+        parts.append("_Not run yet._\n")
     path = Path(out)
     path.write_text("".join(parts))
     return {"out": str(path), "n_runs": len(rows), "n_benchmarks": len(benches)}

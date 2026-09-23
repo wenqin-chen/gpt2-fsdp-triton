@@ -71,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_bench = sub.add_parser("bench-layernorm", help="Triton vs eager vs compile LayerNorm")
     p_bench.add_argument("--out", required=True)
+    p_bench.add_argument("--label", default="", help="kernel variant, recorded in the output")
 
     p_rep = sub.add_parser("report", help="RESULTS.md tables from run logs")
     p_rep.add_argument("--runs", default="runs")
@@ -95,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "bench-layernorm":
         from gptfsdp.bench import bench_layernorm
 
-        summary = bench_layernorm(args.out)
+        summary = bench_layernorm(args.out, label=args.label)
     else:
         from gptfsdp.report import write_results
 

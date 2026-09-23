@@ -1,15 +1,19 @@
 """Fused LayerNorm in Triton: forward and backward (dx, dweight, dbias).
 
 Forward: one program per row; statistics in fp32; writes ``y`` in the input dtype and the per-row
-``mean`` and ``rstd`` for the backward pass.
+``mean`` and ``rstd`` for the backward pass. (A 2-D tiled forward and a fused dW/dB reduction kernel
+were tried and measured slower on an H200; see RESULTS.md.)
 
-Backward: each program owns ``ROWS_PER_PROG`` consecutive rows; for every row it computes
+Backward: each program owns ``ROWS_PER_PROG`` consecutive rows and walks them in 2-D tiles of
+``ROWS`` rows x ``BLOCK_N`` columns (several rows in flight per iteration); for every row
 
     xhat = (x - mean) * rstd,   g = w * dy,
     dx   = (g - (xhat * mean(xhat * g) + mean(g))) * rstd,
 
-and accumulates ``dy * xhat`` and ``dy`` into fp32 partial sums that are written once per program
-and reduced with ``torch.sum`` (no atomics, no locks). The launch uses ~4 programs per SM.
+and ``dy * xhat`` and ``dy`` are accumulated into fp32 partial sums that are written once per
+program and reduced with ``torch.sum`` (no atomics, no locks). The launch uses ~8 programs per SM;
+``ROWS`` shrinks as rows get wider to keep the tile in registers. (v1 walked one row at a time
+with ~4 programs per SM and was latency-bound: slower than eager for GPT-2 shapes.)
 
 ``TritonLayerNorm`` has the same parameters (``weight``, ``bias``) and state-dict keys as
 ``nn.LayerNorm``, so checkpoints are interchangeable; on CPU tensors it falls back to
@@ -18,6 +22,7 @@ and reduced with ``torch.sum`` (no atomics, no locks). The launch uses ~4 progra
 
 from __future__ import annotations
 
+import functools
 from typing import Any
 
 import torch
@@ -61,31 +66,47 @@ if HAS_TRITON:
     def _ln_bwd(
         DY, X, W, Mean, Rstd, DX, DW_part, DB_part,
         stride, N, M,
-        ROWS_PER_PROG: tl.constexpr, BLOCK_N: tl.constexpr,
+        ROWS_PER_PROG: tl.constexpr, ROWS: tl.constexpr, BLOCK_N: tl.constexpr,
     ):  # fmt: skip
         pid = tl.program_id(0)
         cols = tl.arange(0, BLOCK_N)
-        mask = cols < N
-        w = tl.load(W + cols, mask=mask, other=0.0).to(tl.float32)
+        col_mask = cols < N
+        w = tl.load(W + cols, mask=col_mask, other=0.0).to(tl.float32)
         dw_acc = tl.zeros([BLOCK_N], dtype=tl.float32)
         db_acc = tl.zeros([BLOCK_N], dtype=tl.float32)
-        for r in range(ROWS_PER_PROG):
-            row = pid * ROWS_PER_PROG + r
-            if row < M:
-                x = tl.load(X + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
-                dy = tl.load(DY + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
-                mean = tl.load(Mean + row)
-                rstd = tl.load(Rstd + row)
-                xhat = tl.where(mask, (x - mean) * rstd, 0.0)
-                g = tl.where(mask, w * dy, 0.0)
-                c1 = tl.sum(xhat * g, axis=0) / N
-                c2 = tl.sum(g, axis=0) / N
-                dx = (g - (xhat * c1 + c2)) * rstd
-                tl.store(DX + row * stride + cols, dx.to(DX.dtype.element_ty), mask=mask)
-                dw_acc += dy * xhat
-                db_acc += dy
-        tl.store(DW_part + pid * N + cols, dw_acc, mask=mask)
-        tl.store(DB_part + pid * N + cols, db_acc, mask=mask)
+        for r0 in range(0, ROWS_PER_PROG, ROWS):
+            rows = pid * ROWS_PER_PROG + r0 + tl.arange(0, ROWS)
+            row_mask = rows < M
+            mask = row_mask[:, None] & col_mask[None, :]
+            offs = rows[:, None] * stride + cols[None, :]
+            x = tl.load(X + offs, mask=mask, other=0.0).to(tl.float32)
+            dy = tl.load(DY + offs, mask=mask, other=0.0).to(tl.float32)
+            mean = tl.load(Mean + rows, mask=row_mask, other=0.0)
+            rstd = tl.load(Rstd + rows, mask=row_mask, other=0.0)
+            xhat = tl.where(mask, (x - mean[:, None]) * rstd[:, None], 0.0)
+            g = tl.where(mask, w[None, :] * dy, 0.0)
+            c1 = tl.sum(xhat * g, axis=1) / N
+            c2 = tl.sum(g, axis=1) / N
+            dx = (g - (xhat * c1[:, None] + c2[:, None])) * rstd[:, None]
+            tl.store(DX + offs, dx.to(DX.dtype.element_ty), mask=mask)
+            dw_acc += tl.sum(dy * xhat, axis=0)
+            db_acc += tl.sum(dy, axis=0)
+        tl.store(DW_part + pid * N + cols, dw_acc, mask=col_mask)
+        tl.store(DB_part + pid * N + cols, db_acc, mask=col_mask)
+
+
+@functools.lru_cache(maxsize=16)
+def _sm_count(device_index: int) -> int:
+    return int(torch.cuda.get_device_properties(device_index).multi_processor_count)
+
+
+def _bwd_params(m: int, block_n: int, device_index: int) -> tuple[int, int, int, int]:
+    """(ROWS, ROWS_PER_PROG, n_prog, num_warps): ~8 programs per SM, tiles of <= 4096 elements."""
+    rows = max(1, min(4, 4096 // block_n))
+    per_prog = triton.cdiv(triton.cdiv(m, 8 * _sm_count(device_index)), rows) * rows
+    n_prog = triton.cdiv(m, per_prog)
+    num_warps = min(max(rows * block_n // 512, 1), 8)
+    return rows, per_prog, n_prog, num_warps
 
 
 def _launch_params(n: int, element_size: int) -> tuple[int, int]:
@@ -113,7 +134,7 @@ class _LayerNormFn(torch.autograd.Function):
             BLOCK_N=block_n, num_warps=num_warps,
         )  # fmt: skip
         ctx.save_for_backward(x2, weight, mean, rstd)
-        ctx.shape, ctx.block_n, ctx.num_warps = shape, block_n, num_warps
+        ctx.shape, ctx.block_n = shape, block_n
         ctx.bias_dtype = bias.dtype
         return y.view(shape)
 
@@ -125,14 +146,12 @@ class _LayerNormFn(torch.autograd.Function):
         m, n = x2.shape
         dy2 = dy.reshape(-1, n).contiguous()
         dx = torch.empty_like(x2)
-        sms = torch.cuda.get_device_properties(x2.device).multi_processor_count
-        rows_per_prog = triton.cdiv(m, 4 * sms)
-        n_prog = triton.cdiv(m, rows_per_prog)
+        rows, per_prog, n_prog, num_warps = _bwd_params(m, ctx.block_n, x2.device.index or 0)
         dw_part = torch.empty((n_prog, n), dtype=torch.float32, device=x2.device)
         db_part = torch.empty((n_prog, n), dtype=torch.float32, device=x2.device)
         _ln_bwd[(n_prog,)](
             dy2, x2, weight, mean, rstd, dx, dw_part, db_part, x2.stride(0), n, m,
-            ROWS_PER_PROG=rows_per_prog, BLOCK_N=ctx.block_n, num_warps=ctx.num_warps,
+            ROWS_PER_PROG=per_prog, ROWS=rows, BLOCK_N=ctx.block_n, num_warps=num_warps,
         )  # fmt: skip
         dw = dw_part.sum(0).to(weight.dtype)
         db = db_part.sum(0).to(ctx.bias_dtype)

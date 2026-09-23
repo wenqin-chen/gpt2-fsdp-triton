@@ -43,7 +43,9 @@ def _check(m: int, n: int, dtype: torch.dtype) -> dict[str, float]:
     return errs
 
 
-def bench_layernorm(out: str | Path, dtype: torch.dtype = torch.bfloat16) -> dict[str, Any]:
+def bench_layernorm(
+    out: str | Path, dtype: torch.dtype = torch.bfloat16, label: str = ""
+) -> dict[str, Any]:
     if not torch.cuda.is_available():
         raise RuntimeError("the LayerNorm benchmark needs a CUDA GPU")
     from triton.testing import do_bench
@@ -92,7 +94,11 @@ def bench_layernorm(out: str | Path, dtype: torch.dtype = torch.bfloat16) -> dic
                 row[base]["fwd_bwd_ms"] / row["triton"]["fwd_bwd_ms"]
             )
         rows.append(row)
+    from gptfsdp.train import _git_sha
+
     result = {
+        "label": label,
+        "git_sha": _git_sha(),
         "device": torch.cuda.get_device_name(),
         "torch": torch.__version__,
         "triton": __import__("triton").__version__,
