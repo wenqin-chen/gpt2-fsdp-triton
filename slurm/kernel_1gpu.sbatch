@@ -3,7 +3,7 @@
 #SBATCH --job-name=gpt2-kernel
 #SBATCH --account=stf
 #SBATCH --partition=gpu-h200
-#SBATCH --qos=normal
+#SBATCH --qos=debug
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=32G
