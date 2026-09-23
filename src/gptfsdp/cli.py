@@ -1,4 +1,5 @@
-"""``gptfsdp`` command line: ``train``, ``prepare``, ``hellaswag``, ``bench-layernorm``, ``report``.
+"""``gptfsdp`` command line: ``train``, ``prepare``, ``heldout``, ``hellaswag``,
+``bench-layernorm`` and ``report``.
 
 ``train`` reads an optional JSON config and applies ``--set key=value`` overrides (typed from the
 dataclass defaults), so the same command runs on a laptop and under ``torchrun``::
@@ -69,6 +70,14 @@ def main(argv: list[str] | None = None) -> int:
     p_hs.add_argument("--data", required=True, help="hellaswag_val.jsonl")
     p_hs.add_argument("--limit", type=int, default=0)
 
+    p_ho = sub.add_parser("heldout", help="loss on the validation shard (same tokens for all)")
+    src = p_ho.add_mutually_exclusive_group(required=True)
+    src.add_argument("--run", help="run directory (uses its newest checkpoint)")
+    src.add_argument("--gpt2", help="OpenAI GPT-2 124M model.safetensors (file or directory)")
+    p_ho.add_argument("--data", required=True, help="shard directory (uses its val shard)")
+    p_ho.add_argument("--tokens", type=int, default=10_485_760)
+    p_ho.add_argument("--out", default="baselines/openai_gpt2_heldout.json", help="for --gpt2")
+
     p_bench = sub.add_parser("bench-layernorm", help="Triton vs eager vs compile LayerNorm")
     p_bench.add_argument("--out", required=True)
     p_bench.add_argument("--label", default="", help="kernel variant, recorded in the output")
@@ -93,6 +102,13 @@ def main(argv: list[str] | None = None) -> int:
         from gptfsdp.hellaswag import evaluate_run
 
         summary = evaluate_run(args.run, args.data, limit=args.limit)
+    elif args.command == "heldout":
+        from gptfsdp.evaluate import evaluate_checkpoint, evaluate_openai_gpt2
+
+        if args.run:
+            summary = evaluate_checkpoint(args.run, args.data, args.tokens)
+        else:
+            summary = evaluate_openai_gpt2(args.gpt2, args.data, args.tokens, args.out)
     elif args.command == "bench-layernorm":
         from gptfsdp.bench import bench_layernorm
 

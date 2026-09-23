@@ -140,6 +140,26 @@ def write_results(
     if rows:
         sources = sorted({r["peak_source"] for r in rows if r["peak_source"]})
         parts.append("\nMFU peaks: " + "; ".join(sources) + ".\n" if sources else "")
+    parts.append("\n## Held-out loss (validation shard 0, identical tokens for every model)\n\n")
+    heldout = [
+        (f"`{r['run_id']}`", rec)
+        for r in rows
+        for rec in read_log(runs_dir / r["run_id"])
+        if rec.get("event") == "heldout"
+    ]
+    baseline = Path("baselines/openai_gpt2_heldout.json")
+    if baseline.is_file():
+        rec = json.loads(baseline.read_text())
+        heldout.append((rec["model"], rec))
+    if heldout:
+        parts.append("| model | checkpoint | tokens | loss | perplexity |\n|---|---|---|---|---|\n")
+        for name, rec in heldout:
+            parts.append(
+                f"| {name} | {rec.get('checkpoint', '—')} | {rec['tokens']:,} | "
+                f"{rec['val_loss']:.4f} | {rec['perplexity']:.2f} |\n"
+            )
+    else:
+        parts.append("_Not run yet._\n")
     files = sorted(Path(bench_dir).glob("*.json")) if Path(bench_dir).is_dir() else []
     benches = [(p.name, json.loads(p.read_text())) for p in files]
     parts.append("\n## Triton LayerNorm benchmark\n\n")

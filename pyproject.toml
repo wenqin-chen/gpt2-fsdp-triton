@@ -30,7 +30,7 @@ dependencies = [
 # exactly one torch build: `cpu` (Mac, CI) or `cu130` (cluster GPUs; brings triton)
 cpu = ["torch>=2.8"]
 cu130 = ["torch>=2.8"]
-data = ["huggingface_hub>=0.25", "pyarrow>=17"]
+data = ["huggingface_hub>=0.25", "pyarrow>=17", "safetensors>=0.4"]
 dev = [
   "pytest>=8.3",
   "ruff>=0.9",
