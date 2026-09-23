@@ -35,9 +35,12 @@ hand into the README.
   document, stored as `uint16` shards of 100M tokens; shard 0 is the validation shard and is never
   trained on. The download and tokenization run on the cluster (the development Mac has ~19 GB
   free); a manifest records the dataset revision, shard sizes and sha256.
-- **HellaSwag:** the validation split (`hellaswag_val.jsonl`, 10,042 items), scored as in the
-  common completion protocol: the ending with the lowest mean token loss over the ending wins
-  (`acc_norm`-style).
+- **HellaSwag — dropped (2026-09-23):** the upstream repository `rowanz/hellaswag` is blocked by a
+  wikiHow DMCA notice of 2026-09-14 that lists it as an infringing dataset; the project does not
+  fetch it from mirrors. The scoring code stays (tested on a fixture). Replacement, pending the
+  owner's approval of the downloads: held-out loss on validation shard 0 for this model and for
+  OpenAI's released GPT-2 124M (`openai-community/gpt2`, MIT) on identical tokens, optionally plus
+  ARC-Easy (AI2, CC BY-SA 4.0) scored with the same completion harness for both models.
 - **References (verified 2026-09-22):** llm.c's GPT-2 124M reproduction on plain FineWeb 10B
   tokens reached validation loss 3.29 and HellaSwag 29.9 % in ~90 min on 8×A100 80GB with up to
   ~60 % MFU (llm.c discussion #481). FineWeb and FineWeb-Edu validation losses are not
@@ -104,7 +107,15 @@ kernel that never materialises the (B·T × vocab) logits.
   synchronisation; any number from a partial run says so.
 - Comparisons with llm.c or GPT-2 are limited to HellaSwag and stated with their source.
 
-## 9. Compute (decision pending)
+## 9. Compute (decided 2026-09-23: UW Tillicum)
+
+Tillicum's H200 partition is oversubscribed (all healthy nodes allocated, dozens of multi-day
+jobs pending): full-node jobs with walls of 40 min or more waited a day or longer, while 30-min
+two-node jobs backfilled within hours. So the full run is 2 nodes x 8 H200 with FSDP2 in
+resumable 30-min chunks (`slurm/full_run_2node.sbatch`), and each 8-GPU calibration configuration
+is its own 10-min job. Single-GPU work uses the free `debug` QOS (1 GPU, 1 h).
+
+Original options:
 
 | Option | Hardware | Notes |
 |---|---|---|
