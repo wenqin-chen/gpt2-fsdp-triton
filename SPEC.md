@@ -1,8 +1,9 @@
 # gpt2-fsdp-triton — SPEC v0.1 (2026-09-22)
 
 Pretrain a GPT-2-small-class (124M) language model on the FineWeb-Edu 10B-token sample with
-PyTorch DDP and FSDP on multiple GPUs, report throughput and MFU honestly, evaluate on HellaSwag,
-and ship one custom Triton kernel benchmarked against PyTorch eager and `torch.compile`.
+PyTorch DDP and FSDP on multiple GPUs, report throughput and MFU honestly, evaluate held-out loss
+against OpenAI's GPT-2 124M, and ship one custom Triton kernel benchmarked against PyTorch eager
+and `torch.compile`.
 
 This is project P2 of the gap-closing sprint: it exists to make the following claim true, with a
 public repository as the receipt.
@@ -18,7 +19,8 @@ Every blank is filled only from a run log (section 8).
 1. Public repository, CI green (CPU tests).
 2. A full 10B-token run (one epoch of the sample) with logged loss, tokens/s and MFU.
 3. A two-node run (16 GPUs) with logged throughput, reported as scaling efficiency against one node.
-4. HellaSwag (validation, 10,042 items) evaluated on the final checkpoint.
+4. Held-out loss of the final checkpoint and of OpenAI's GPT-2 124M on identical validation tokens
+   (HellaSwag was planned; see section 3).
 5. A kernel benchmark table (Triton vs eager vs `torch.compile`, forward and forward+backward,
    several shapes) plus the kernel's effect on end-to-end step time.
 
@@ -44,8 +46,8 @@ hand into the README.
 - **References (verified 2026-09-22):** llm.c's GPT-2 124M reproduction on plain FineWeb 10B
   tokens reached validation loss 3.29 and HellaSwag 29.9 % in ~90 min on 8×A100 80GB with up to
   ~60 % MFU (llm.c discussion #481). FineWeb and FineWeb-Edu validation losses are not
-  comparable, so the cross-project comparison is HellaSwag; the loss curve is compared only
-  against this project's own runs.
+  comparable, so llm.c's loss is context only; the head-to-head comparison is this project's model
+  against OpenAI's GPT-2 124M on the same FineWeb-Edu validation tokens.
 
 ## 4. Model and recipe
 
@@ -57,7 +59,7 @@ projections scaled by 1/sqrt(2·n_layer)), attention through `F.scaled_dot_produ
 | Item | Value |
 |---|---|
 | Tokens per optimizer step | 524,288 (2^19) = micro-batch × 1024 × world × grad-accumulation |
-| Steps for one epoch of 10B tokens | 19,073 |
+| Steps for one epoch | 18,722 (99 train shards; the loader drops each shard's tail < one step): 9,815,719,936 tokens |
 | Optimizer | AdamW (fused on CUDA), β = (0.9, 0.95), ε = 1e-8, weight decay 0.1 on ≥2-D tensors |
 | Learning rate | 6e-4 peak, linear warm-up 715 steps, cosine to 6e-5 |
 | Gradient clipping | 1.0 (global norm) |
@@ -84,8 +86,7 @@ loss of an uninterrupted run at the next logged step (tested on CPU with two pro
 - **MFU** = (6·N + 12·L·H·Q·T) × tokens/s / (n_GPUs × peak bf16 dense FLOP/s), where N counts
   non-embedding + embedding parameters as in nanoGPT's `estimate_mfu`; the peak value and its
   source are logged with every run (e.g. H200 SXM and A100 per NVIDIA datasheets).
-- Validation loss every 250 steps on a fixed slice of shard 0; HellaSwag at the end (and
-  optionally every N steps).
+- Validation loss every 250 steps on a fixed slice of shard 0; the held-out comparison at the end.
 - Memory: peak allocated per GPU.
 
 ## 7. Triton kernel
@@ -105,7 +106,8 @@ kernel that never materialises the (B·T × vocab) logits.
   logs, never typed.
 - MFU uses the formula above with the peak stated; throughput is measured after warm-up with
   synchronisation; any number from a partial run says so.
-- Comparisons with llm.c or GPT-2 are limited to HellaSwag and stated with their source.
+- Comparisons with other projects are stated with their source; the GPT-2 124M comparison is run
+  by this project's code on the same tokens.
 
 ## 9. Compute (decided 2026-09-23: UW Tillicum)
 
