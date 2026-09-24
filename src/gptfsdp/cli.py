@@ -1,5 +1,5 @@
-"""``gptfsdp`` command line: ``train``, ``prepare``, ``heldout``, ``hellaswag``,
-``bench-layernorm`` and ``report``.
+"""``gptfsdp`` command line: ``train``, ``prepare``, ``heldout``, ``arc-easy``, ``download-evals``,
+``hellaswag``, ``bench-layernorm`` and ``report``.
 
 ``train`` reads an optional JSON config and applies ``--set key=value`` overrides (typed from the
 dataclass defaults), so the same command runs on a laptop and under ``torchrun``::
@@ -78,6 +78,17 @@ def main(argv: list[str] | None = None) -> int:
     p_ho.add_argument("--tokens", type=int, default=10_485_760)
     p_ho.add_argument("--out", default="baselines/openai_gpt2_heldout.json", help="for --gpt2")
 
+    p_arc = sub.add_parser("arc-easy", help="ARC-Easy test accuracy (same harness for all)")
+    arc_src = p_arc.add_mutually_exclusive_group(required=True)
+    arc_src.add_argument("--run", help="run directory (uses its newest checkpoint)")
+    arc_src.add_argument("--gpt2", help="OpenAI GPT-2 124M model.safetensors (file or directory)")
+    p_arc.add_argument("--data", required=True, help="ARC-Easy test parquet")
+    p_arc.add_argument("--out", default="baselines/openai_gpt2_arc_easy.json", help="for --gpt2")
+
+    p_dl = sub.add_parser("download-evals", help="GPT-2 124M weights + ARC-Easy test (pinned)")
+    p_dl.add_argument("--out", required=True, help="directory for the downloads")
+    p_dl.add_argument("--manifest", default="baselines/downloads.json")
+
     p_bench = sub.add_parser("bench-layernorm", help="Triton vs eager vs compile LayerNorm")
     p_bench.add_argument("--out", required=True)
     p_bench.add_argument("--label", default="", help="kernel variant, recorded in the output")
@@ -109,6 +120,20 @@ def main(argv: list[str] | None = None) -> int:
             summary = evaluate_checkpoint(args.run, args.data, args.tokens)
         else:
             summary = evaluate_openai_gpt2(args.gpt2, args.data, args.tokens, args.out)
+    elif args.command == "arc-easy":
+        from gptfsdp.arc import evaluate_run_or_gpt2
+
+        summary = evaluate_run_or_gpt2(args.data, run=args.run, gpt2=args.gpt2, out=args.out)
+    elif args.command == "download-evals":
+        from gptfsdp import arc
+        from gptfsdp.evaluate import download_gpt2
+
+        summary = {
+            "gpt2": download_gpt2(Path(args.out) / "gpt2"),
+            "arc_easy_test": arc.download(Path(args.out) / "ai2_arc"),
+        }
+        Path(args.manifest).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.manifest).write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     elif args.command == "bench-layernorm":
         from gptfsdp.bench import bench_layernorm
 

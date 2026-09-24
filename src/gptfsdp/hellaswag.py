@@ -1,4 +1,6 @@
-"""HellaSwag (validation, 10,042 items) completion scoring.
+"""Multiple-choice completion scoring (HellaSwag format; used for ARC-Easy, see :mod:`gptfsdp.arc`).
+
+HellaSwag itself (validation, 10,042 items) was dropped: its upstream repository is DMCA-blocked.
 
 Each item has a context and four endings. Every ending is scored by the model's cross-entropy on
 the ending tokens given the context; the prediction is the ending with the lowest *mean* token
@@ -31,7 +33,7 @@ def iter_items(path: str | Path) -> Iterator[dict[str, Any]]:
 def render(
     item: dict[str, Any], encode: Callable[[str], list[int]]
 ) -> tuple[torch.Tensor, torch.Tensor, int]:
-    """(tokens [4, L], ending mask [4, L], label) with right padding by zeros."""
+    """(tokens [k, L], ending mask [k, L], label) for k endings, right-padded with zeros."""
     ctx = encode(item["ctx"])
     rows, masks = [], []
     for ending in item["endings"]:
@@ -39,8 +41,8 @@ def render(
         rows.append(ctx + end)
         masks.append([0] * len(ctx) + [1] * len(end))
     width = max(len(r) for r in rows)
-    tokens = torch.zeros((4, width), dtype=torch.long)
-    mask = torch.zeros((4, width), dtype=torch.long)
+    tokens = torch.zeros((len(rows), width), dtype=torch.long)
+    mask = torch.zeros((len(rows), width), dtype=torch.long)
     for i, (r, m) in enumerate(zip(rows, masks, strict=True)):
         tokens[i, : len(r)] = torch.tensor(r)
         mask[i, : len(m)] = torch.tensor(m)

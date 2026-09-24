@@ -100,8 +100,8 @@ def val_loss(
     return {"tokens": count, "val_loss": mean, "perplexity": math.exp(mean)}
 
 
-def evaluate_checkpoint(run_dir: str | Path, data_dir: str | Path, tokens: int) -> dict[str, Any]:
-    """``val_loss`` of a run's newest checkpoint, appended to its log as ``event: heldout``."""
+def load_run_model(run_dir: str | Path, device: torch.device) -> tuple[GPT, dict[str, Any]]:
+    """A run's newest complete checkpoint in a single-process model (DCP reshards FSDP state)."""
     import torch.distributed.checkpoint as dcp
     from torch.distributed.checkpoint.state_dict import get_model_state_dict, set_model_state_dict
 
@@ -113,17 +113,48 @@ def evaluate_checkpoint(run_dir: str | Path, data_dir: str | Path, tokens: int) 
     src = ckpt.latest(run / "ckpt")
     if src is None:
         raise FileNotFoundError(f"no complete checkpoint under {run / 'ckpt'}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = GPT(cfg.model_config()).to(device)
     state = {"model": get_model_state_dict(model)}
     dcp.load(state, checkpoint_id=str(src))
     set_model_state_dict(model, state["model"])
-    result = val_loss(model, data_dir, tokens, seq_len=cfg.seq_len, device=device)
-    extra = json.loads((src / "extra.json").read_text())
-    record = {"event": "heldout", "checkpoint": src.name, "step": extra["step"], **result}
-    with (run / "log.jsonl").open("a") as f:
+    extra: dict[str, Any] = json.loads((src / "extra.json").read_text())
+    extra.update(checkpoint=src.name, seq_len=cfg.seq_len)
+    return model, extra
+
+
+def evaluate_checkpoint(run_dir: str | Path, data_dir: str | Path, tokens: int) -> dict[str, Any]:
+    """``val_loss`` of a run's newest checkpoint, appended to its log as ``event: heldout``."""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model, extra = load_run_model(run_dir, device)
+    result = val_loss(model, data_dir, tokens, seq_len=int(extra["seq_len"]), device=device)
+    record = {
+        "event": "heldout",
+        "checkpoint": extra["checkpoint"],
+        "step": extra["step"],
+        **result,
+    }
+    with (Path(run_dir) / "log.jsonl").open("a") as f:
         f.write(json.dumps(record, sort_keys=True) + "\n")
     return record
+
+
+def download_gpt2(out_dir: str | Path) -> dict[str, Any]:
+    """OpenAI GPT-2 124M ``model.safetensors`` (``openai-community/gpt2``) at a pinned revision."""
+    import hashlib
+
+    from huggingface_hub import HfApi, hf_hub_download
+
+    repo = "openai-community/gpt2"
+    revision = HfApi().model_info(repo).sha
+    path = Path(
+        hf_hub_download(repo, "model.safetensors", revision=revision, local_dir=str(out_dir))
+    )
+    return {
+        "repo_id": repo,
+        "path": str(path),
+        "revision": revision,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
 
 
 def evaluate_openai_gpt2(

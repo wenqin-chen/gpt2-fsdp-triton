@@ -195,6 +195,30 @@ def write_results(
             )
     else:
         parts.append("_Not run yet._\n")
+    parts.append(
+        "\n## ARC-Easy (test, zero-shot, same harness for every model)\n\n"
+        "Prompt `Question: …\\nAnswer:` + ` choice`; `acc_norm` picks the lowest mean token loss, "
+        "`acc` the lowest summed loss. Compare rows with each other, not with other harnesses.\n\n"
+    )
+    arc = [
+        (f"`{r['run_id']}`", rec)
+        for r in rows
+        for rec in read_log(runs_dir / r["run_id"])
+        if rec.get("event") == "arc_easy"
+    ]
+    arc_baseline = Path("baselines/openai_gpt2_arc_easy.json")
+    if arc_baseline.is_file():
+        rec = json.loads(arc_baseline.read_text())
+        arc.append((rec["model"], rec))
+    if arc:
+        parts.append("| model | checkpoint | questions | acc_norm | acc |\n|---|---|---|---|---|\n")
+        for name, rec in arc:
+            parts.append(
+                f"| {name} | {rec.get('checkpoint', '—')} | {rec['n']:,} | "
+                f"{rec['acc_norm']:.4f} | {rec['acc']:.4f} |\n"
+            )
+    else:
+        parts.append("_Not run yet._\n")
     files = sorted(Path(bench_dir).glob("*.json")) if Path(bench_dir).is_dir() else []
     benches = [(p.name, json.loads(p.read_text())) for p in files]
     parts.append("\n## Triton LayerNorm benchmark\n\n")

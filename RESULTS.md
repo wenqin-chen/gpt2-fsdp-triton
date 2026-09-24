@@ -32,6 +32,12 @@ MFU peaks: NVIDIA H200 SXM datasheet: 1,979 TFLOPS with sparsity / 2.
 
 _Not run yet._
 
+## ARC-Easy (test, zero-shot, same harness for every model)
+
+Prompt `Question: …\nAnswer:` + ` choice`; `acc_norm` picks the lowest mean token loss, `acc` the lowest summed loss. Compare rows with each other, not with other harnesses.
+
+_Not run yet._
+
 ## Triton LayerNorm benchmark
 
 Latest: `20260923T002639_layernorm_v2.json` (v2).
