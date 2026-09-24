@@ -74,6 +74,57 @@ def test_checkpoint_resume_reproduces_the_uninterrupted_run(tmp_path: Path) -> N
     assert kept == ["step_0000006", "step_0000012"]
 
 
+def test_chunks_are_logged_and_a_new_micro_batch_keeps_the_math(tmp_path: Path) -> None:
+    """A second job with half the micro-batch (twice the accumulation, as on half the GPUs)."""
+    train(tiny_cfg(tmp_path, run_name="straight", max_steps=12))
+    first = train(tiny_cfg(tmp_path, run_name="chunked", max_steps=12, time_limit_s=1e-9))
+    assert first["status"] == "partial" and first["final_step"] == 1
+    second = train(
+        tiny_cfg(tmp_path, run_name="chunked", max_steps=12, micro_batch=2, resume="latest")
+    )
+    assert second["status"] == "ok" and second["final_step"] == 12
+    run = tmp_path / "runs" / "chunked"
+    chunks = [r for r in read_log(run) if r["event"] == "chunk"]
+    assert [(c["start_step"], c["micro_batch"], c["grad_accum"]) for c in chunks] == [
+        (0, 4, 2),
+        (1, 2, 4),
+    ]
+    assert chunks[0]["config_changes"] == {}
+    assert chunks[1]["config_changes"] == {
+        "micro_batch": 2,
+        "resume": "latest",
+        "time_limit_s": 0.0,
+    }
+    assert json.loads((run / "config.json").read_text())["micro_batch"] == 4  # the first job's
+    manifest = json.loads((run / "manifest.json").read_text())
+    assert manifest["grad_accum"] == 4 and manifest["final_step"] == 12
+    a, b = losses(tmp_path / "runs" / "straight"), losses(run)
+    for step in a:
+        assert b[step] == pytest.approx(a[step], rel=1e-4), step
+
+
+def test_the_first_chunk_of_an_older_log_is_rebuilt(tmp_path: Path) -> None:
+    train(tiny_cfg(tmp_path, run_name="old", max_steps=12, time_limit_s=1e-9))
+    run = tmp_path / "runs" / "old"
+    lines = (run / "log.jsonl").read_text().splitlines()
+    (run / "log.jsonl").write_text("".join(x + "\n" for x in lines if '"chunk"' not in x))
+    train(tiny_cfg(tmp_path, run_name="old", max_steps=12, micro_batch=2, resume="latest"))
+    chunks = [r for r in read_log(run) if r["event"] == "chunk"]
+    assert len(chunks) == 2 and chunks[0]["retroactive"] and not chunks[1].get("retroactive")
+    assert (chunks[0]["start_step"], chunks[0]["micro_batch"], chunks[0]["grad_accum"]) == (0, 4, 2)
+    assert chunks[0]["world"] == 1 and chunks[1]["start_step"] == 1
+
+
+def test_resuming_a_finished_run_changes_nothing(tmp_path: Path) -> None:
+    done = train(tiny_cfg(tmp_path, run_name="done", max_steps=6))
+    run = tmp_path / "runs" / "done"
+    before = {p.name: p.read_bytes() for p in run.iterdir() if p.is_file()}
+    again = train(tiny_cfg(tmp_path, run_name="done", max_steps=6, resume="latest"))
+    assert (again["steps_done"], again["final_step"]) == (0, 6)
+    assert again["final_val_loss"] == done["final_val_loss"]
+    assert {p.name: p.read_bytes() for p in run.iterdir() if p.is_file()} == before
+
+
 def _torchrun(tmp_path: Path, name: str, parallel: str) -> Path:
     cfg = tiny_cfg(
         tmp_path, run_name=name, parallel=parallel, max_steps=6, val_every=0, val_steps=0

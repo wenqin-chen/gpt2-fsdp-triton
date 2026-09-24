@@ -1,9 +1,10 @@
 """RESULTS.md from run directories and benchmark files - no number is typed by hand.
 
 Per run: parallel mode, world size, device, steps, tokens seen, median tokens/s and MFU over the
-logged steps that are not flagged ``timing_warmup``, peak memory, final validation loss and the
-latest HellaSwag record. Every row names its run id; the manifest's git sha and peak source are
-listed under the table. LayerNorm benchmark files (``bench/*.json``) become a second table.
+logged steps that are not flagged ``timing_warmup``, peak memory and final validation loss. A run
+that several jobs trained ("chunks", see ``train.py``) gets one row per chunk, because tokens/s
+depends on the number of GPUs. Every row names its run id; the manifest's git sha and peak source
+are listed under the table. LayerNorm benchmark files (``bench/*.json``) become their own tables.
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ import statistics
 from pathlib import Path
 from typing import Any
 
+CHUNK_FIELDS = ("world", "parallel", "device", "micro_batch", "grad_accum", "slurm_job_id")
+
 
 def read_log(run_dir: Path) -> list[dict[str, Any]]:
     path = run_dir / "log.jsonl"
@@ -21,24 +24,36 @@ def read_log(run_dir: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def summarize_run(run_dir: Path) -> dict[str, Any] | None:
-    manifest_path = run_dir / "manifest.json"
-    if not manifest_path.is_file():
-        return None
-    manifest = json.loads(manifest_path.read_text())
-    records = read_log(run_dir)
+def split_chunks(
+    records: list[dict[str, Any]],
+) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
+    """A run's log as (chunk record, records the chunk wrote) pairs, in log order.
+
+    A ``chunk`` record opens a chunk. Records before the first one were written by a job that
+    predates chunk records; the ``retroactive`` chunk record a later job rebuilt describes them.
+    A log without chunk records is one chunk with an empty description.
+    """
+    retro = next((r for r in records if r.get("event") == "chunk" and r.get("retroactive")), {})
+    chunks: list[tuple[dict[str, Any], list[dict[str, Any]]]] = [(retro, [])]
+    for r in records:
+        if r.get("event") != "chunk":
+            chunks[-1][1].append(r)
+        elif not r.get("retroactive"):
+            if chunks[-1][0] or chunks[-1][1]:
+                chunks.append((r, []))
+            else:
+                chunks[-1] = (r, [])
+    return chunks
+
+
+def _stats(records: list[dict[str, Any]]) -> dict[str, Any]:
     steps = [r for r in records if r.get("event") == "step"]
     timed = [r for r in steps if not r.get("timing_warmup")]
     vals = [r for r in records if r.get("event") == "val"]
-    hs = [r for r in records if r.get("event") == "hellaswag"]
     mfus = [r["mfu"] for r in timed if r.get("mfu") is not None]
     mems = [r["max_mem_gb"] for r in steps if "max_mem_gb" in r]
     return {
-        "run_id": manifest.get("run_id", run_dir.name),
-        "status": manifest.get("status"),
-        "parallel": manifest.get("parallel"),
-        "world": manifest.get("world"),
-        "device": manifest.get("device"),
+        "first_step": steps[0]["step"] if steps else None,
         "steps": (steps[-1]["step"] + 1) if steps else 0,
         "tokens_seen": steps[-1]["tokens_seen"] if steps else 0,
         "tokens_per_s": statistics.median(r["tokens_per_s"] for r in timed) if timed else None,
@@ -46,8 +61,31 @@ def summarize_run(run_dir: Path) -> dict[str, Any] | None:
         "n_timed_steps": len(timed),
         "max_mem_gb": max(mems) if mems else None,
         "final_val_loss": vals[-1]["val_loss"] if vals else None,
-        "hellaswag_acc_norm": hs[-1]["acc_norm"] if hs else None,
-        "hellaswag_n": hs[-1]["n"] if hs else None,
+    }
+
+
+def summarize_run(run_dir: Path) -> dict[str, Any] | None:
+    manifest_path = run_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return None
+    manifest = json.loads(manifest_path.read_text())
+    records = read_log(run_dir)
+    parts = [(meta, recs) for meta, recs in split_chunks(records) if _stats(recs)["steps"]]
+    chunks = []
+    for meta, recs in parts:
+        # a lone chunk without a record is described by the manifest; in a multi-chunk run the
+        # manifest describes only the last chunk, so an undescribed chunk stays undescribed
+        source = meta or (manifest if len(parts) == 1 else {})
+        chunks.append({**{k: source.get(k) for k in CHUNK_FIELDS}, **_stats(recs)})
+    return {
+        "run_id": manifest.get("run_id", run_dir.name),
+        "status": manifest.get("status"),
+        "parallel": manifest.get("parallel"),
+        "world": manifest.get("world"),
+        "device": manifest.get("device"),
+        **_stats(records),
+        "chunks": chunks,
+        "tokens_per_step": manifest.get("tokens_per_step"),
         "git_sha": manifest.get("git_sha"),
         "peak_source": manifest.get("peak_source"),
     }
@@ -59,20 +97,47 @@ def _fmt(value: Any, spec: str) -> str:
     return format(value, spec)
 
 
-def runs_table(rows: list[dict[str, Any]]) -> str:
+def runs_table(runs: list[dict[str, Any]]) -> str:
     head = (
         "| run | status | parallel | GPUs | device | steps | tokens | tokens/s (median) | MFU | "
         "peak mem (GiB) | val loss |\n|" + "---|" * 11 + "\n"
     )
     body = ""
-    for r in rows:
-        body += (
-            f"| `{r['run_id']}` | {r['status']} | {r['parallel']} | {r['world']} | {r['device']} | "
-            f"{r['steps']} | {r['tokens_seen']:,} | {_fmt(r['tokens_per_s'], ',.0f')} | "
-            f"{_fmt(r['mfu'], '.1%')} | {_fmt(r['max_mem_gb'], '.1f')} | "
-            f"{_fmt(r['final_val_loss'], '.4f')} |\n"
-        )
+    for run in runs:
+        chunks = run["chunks"] if len(run["chunks"]) > 1 else [run]
+        for i, r in enumerate(chunks, start=1):
+            name, status = f"`{run['run_id']}`", run["status"]
+            if len(chunks) > 1:
+                name += f" chunk {i}/{len(chunks)}"
+                status = status if i == len(chunks) else "partial"
+            body += (
+                f"| {name} | {status} | {r['parallel']} | {r['world']} | {r['device']} | "
+                f"{r['steps']:,} | {r['tokens_seen']:,} | {_fmt(r['tokens_per_s'], ',.0f')} | "
+                f"{_fmt(r['mfu'], '.1%')} | {_fmt(r['max_mem_gb'], '.1f')} | "
+                f"{_fmt(r['final_val_loss'], '.4f')} |\n"
+            )
     return head + body
+
+
+def chunk_notes(runs: list[dict[str, Any]]) -> str:
+    """One sentence per multi-chunk run: which job trained which steps on how many GPUs."""
+    notes = ""
+    for run in runs:
+        chunks = run["chunks"]
+        if len(chunks) < 2:
+            continue
+        jobs = "; ".join(
+            f"SLURM job {c['slurm_job_id'] or '—'}: {c['world']} GPUs, micro-batch "
+            f"{c['micro_batch'] or '—'}, steps {c['first_step']:,}–{c['steps'] - 1:,}"
+            for c in chunks
+        )
+        notes += (
+            f"\n`{run['run_id']}` was trained by {len(chunks)} jobs that resumed one another from "
+            f"sharded checkpoints ({jobs}); every step used "
+            f"{_fmt(run['tokens_per_step'], ',')} tokens, and the checkpoint was resharded "
+            "whenever the number of GPUs changed.\n"
+        )
+    return notes
 
 
 def bench_table(bench: dict[str, Any]) -> str:
@@ -169,7 +234,7 @@ def write_results(
         f"`{src}/*/log.jsonl` and `bench/*.json`; do not edit by hand._\n\n"
         "## Pretraining runs\n\n"
     ]
-    parts.append(runs_table(rows) if rows else "_No runs yet._\n")
+    parts.append(runs_table(rows) + chunk_notes(rows) if rows else "_No runs yet._\n")
     parts.append("\n## Throughput scaling (micro-batch 64 per GPU, bf16, torch.compile)\n\n")
     parts.append(scaling_table({r["run_id"]: r for r in rows}))
     if rows:

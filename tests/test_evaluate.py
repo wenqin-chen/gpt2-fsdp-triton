@@ -81,3 +81,4 @@ def test_load_run_model_restores_the_trained_weights(tmp_path: Path) -> None:
     # the in-run validation used the same first tokens of the val shard (2 x micro-batch 4)
     assert held["val_loss"] == pytest.approx(summary["final_val_loss"], rel=1e-4)
     assert held["event"] == "heldout" and held["step"] == 8
+    assert held["device"] == "cpu" and held["git_sha"] and held["time"]

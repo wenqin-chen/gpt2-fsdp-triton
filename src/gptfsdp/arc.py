@@ -85,12 +85,15 @@ def evaluate_run_or_gpt2(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if (run is None) == (gpt2 is None):
         raise ValueError("pass exactly one of run / gpt2")
+    from gptfsdp.evaluate import provenance
+
     if run is not None:
         from gptfsdp.evaluate import load_run_model
 
         model, extra = load_run_model(run, device)
         record = {"event": "arc_easy", "checkpoint": extra["checkpoint"], "step": extra["step"]}
         record.update(evaluate_model(model, data, device))
+        record.update(provenance(device))
         with (Path(run) / "log.jsonl").open("a") as f:
             f.write(json.dumps(record, sort_keys=True) + "\n")
         return record
@@ -99,6 +102,7 @@ def evaluate_run_or_gpt2(
     assert gpt2 is not None
     record = {"event": "arc_easy", "model": "openai-community/gpt2 (GPT-2 124M, MIT)"}
     record.update(evaluate_model(load_openai_gpt2(gpt2), data, device))
+    record.update(provenance(device))
     path = Path(out)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")

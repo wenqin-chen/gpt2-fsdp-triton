@@ -78,7 +78,8 @@ def test_report_uses_only_logged_numbers(tmp_path: Path) -> None:
     assert (
         s is not None and s["tokens_per_s"] == 3e6 and s["mfu"] == 0.3 and s["n_timed_steps"] == 3
     )
-    assert s["max_mem_gb"] == 13.0 and s["final_val_loss"] == 3.25 and s["hellaswag_n"] == 10042
+    assert s["max_mem_gb"] == 13.0 and s["final_val_loss"] == 3.25 and len(s["chunks"]) == 1
+    assert s["chunks"][0]["world"] == 8  # a log without chunk records: the manifest describes it
     bench = tmp_path / "bench"
     bench.mkdir()
     timing = {"fwd_ms": 0.1, "fwd_bwd_ms": 0.3, "fwd_bwd_gbps": 900.0}
@@ -98,3 +99,33 @@ def test_report_uses_only_logged_numbers(tmp_path: Path) -> None:
         and "3.2500" in text  # final validation loss (the HellaSwag column was dropped)
     )
     assert "16384 × 768" in text and "2.50×" in text and "do not edit by hand" in text
+
+
+def test_a_run_trained_by_several_jobs_gets_one_row_per_job(tmp_path: Path) -> None:
+    runs = tmp_path / "runs"
+    run = _fake_run(runs, "full", 8, [1.0, 2e6, 2e6, 2e6])  # job 1 wrote no chunk record
+    manifest = json.loads((run / "manifest.json").read_text())
+    (run / "manifest.json").write_text(json.dumps({**manifest, "tokens_per_step": 1000}))
+    more = [
+        {"event": "chunk", "retroactive": True, "start_step": 0, "world": 16, "parallel": "fsdp",
+         "device": "NVIDIA H200", "micro_batch": 32, "slurm_job_id": "101"},
+        {"event": "resume", "step": 4},
+        {"event": "chunk", "start_step": 4, "world": 8, "parallel": "fsdp",
+         "device": "NVIDIA H200", "micro_batch": 64, "slurm_job_id": "202"},
+        *({"event": "step", "step": i, "tokens_per_s": 1e6, "mfu": 0.25, "timing_warmup": i == 4,
+           "tokens_seen": (i + 1) * 1000, "max_mem_gb": 20.0} for i in range(4, 7)),
+        {"event": "val", "step": 7, "val_loss": 3.0},
+    ]  # fmt: skip
+    with (run / "log.jsonl").open("a") as f:
+        f.write("".join(json.dumps(r) + "\n" for r in more))
+    s = summarize_run(run)
+    assert s is not None and s["steps"] == 7 and s["final_val_loss"] == 3.0
+    one, two = s["chunks"]
+    assert (one["world"], one["steps"], one["tokens_per_s"]) == (16, 4, 2e6)
+    assert (two["world"], two["first_step"], two["tokens_per_s"], two["mfu"]) == (8, 4, 1e6, 0.25)
+    write_results(runs, tmp_path / "RESULTS.md", bench_dir=tmp_path / "none")
+    text = (tmp_path / "RESULTS.md").read_text()
+    assert "`full` chunk 1/2 | partial | fsdp | 16 |" in text
+    assert "`full` chunk 2/2 | ok | fsdp | 8 |" in text and "1,000,000" in text
+    assert "SLURM job 101: 16 GPUs, micro-batch 32, steps 0–3" in text
+    assert "SLURM job 202: 8 GPUs, micro-batch 64, steps 4–6" in text and "1,000 tokens" in text

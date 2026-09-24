@@ -5,6 +5,12 @@ world size, MFU peak and its source, start/end, status), ``log.jsonl`` (one JSON
 logged step, validation pass and evaluation) and ``ckpt/step_nnnnnnn/`` (DCP checkpoints).
 Every number that reaches RESULTS.md is read back from these files.
 
+A run can span several jobs ("chunks"), each resuming from the newest checkpoint, possibly on a
+different number of GPUs (DCP reshards; the global batch stays the same). Every chunk logs a
+``chunk`` record (first step, world size, micro-batch, SLURM job, git sha, config changes) and
+updates the manifest; ``config.json`` keeps the first chunk's configuration. Resuming a run that
+has already finished changes nothing.
+
 Throughput is measured per optimizer step with a device synchronisation at the end of the step;
 ``tokens_per_s = tokens_per_step / dt``. The first ``cfg.warmup_timing_steps`` steps (compilation,
 allocator warm-up) are logged but flagged ``timing_warmup``.
@@ -100,6 +106,14 @@ def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
+def _read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text()) if path.is_file() else {}
+
+
+# manifest fields that describe one chunk (one job) of a run; a chunk record repeats them
+CHUNK_KEYS = ("world", "parallel", "grad_accum", "device", "slurm_job_id", "git_sha")
+
+
 class RunLog:
     """Rank-0 JSONL log plus the manifest; other ranks write nothing."""
 
@@ -116,8 +130,16 @@ class RunLog:
     def manifest(self, payload: dict[str, Any]) -> None:
         if self.enabled:
             path = self.run_dir / "manifest.json"
-            old = json.loads(path.read_text()) if path.is_file() else {}
-            path.write_text(json.dumps({**old, **payload}, indent=2, sort_keys=True) + "\n")
+            path.write_text(
+                json.dumps({**_read_json(path), **payload}, indent=2, sort_keys=True) + "\n"
+            )
+
+    @staticmethod
+    def read(run_dir: Path) -> list[dict[str, Any]]:
+        path = run_dir / "log.jsonl"
+        if not path.is_file():
+            return []
+        return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 def evaluate_val(
@@ -145,10 +167,9 @@ def train(cfg: TrainConfig) -> dict[str, Any]:
     run_id = cfg.run_name or datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
     run_dir = Path(cfg.out_dir) / run_id
     log = RunLog(run_dir, ctx.is_main)
-    if ctx.is_main:
-        (run_dir / "config.json").write_text(
-            json.dumps(dataclasses.asdict(cfg), indent=2, sort_keys=True) + "\n"
-        )
+    # what earlier chunks of this run left behind (rank 0 alone reads and writes the run files)
+    earlier_config = _read_json(run_dir / "config.json") if ctx.is_main else {}
+    earlier_manifest = _read_json(run_dir / "manifest.json") if ctx.is_main else {}
 
     tokens_per_micro = cfg.micro_batch * cfg.seq_len * ctx.world
     if cfg.total_batch_tokens % tokens_per_micro:
@@ -184,7 +205,7 @@ def train(cfg: TrainConfig) -> dict[str, Any]:
         max_steps=cfg.max_steps,
     )  # fmt: skip
 
-    start_step, tokens_seen = 0, 0
+    start_step, tokens_seen, resumed_from = 0, 0, None
     ckpt_root = run_dir / "ckpt"
     if cfg.resume:
         src = ckpt.latest(ckpt_root) if cfg.resume == "latest" else Path(cfg.resume)
@@ -194,7 +215,37 @@ def train(cfg: TrainConfig) -> dict[str, Any]:
             train_loader.load_state_dict(
                 {"shard": int(extra["loader_shard"]), "pos": int(extra["loader_pos"])}
             )
-            log.write({"event": "resume", "from": str(src), "step": start_step})
+            resumed_from = src
+    if start_step >= cfg.max_steps:  # resumed a finished run: nothing to train, nothing to log
+        dist.teardown(ctx)
+        return {
+            "run_id": run_id, "status": "ok", "steps_done": 0, "final_step": start_step,
+            "tokens_seen": tokens_seen, "final_val_loss": earlier_manifest.get("final_val_loss"),
+            "wall_s": 0.0,
+        }  # fmt: skip
+
+    config = dataclasses.asdict(cfg)
+    continuing = resumed_from is not None and bool(earlier_config)
+    if continuing:
+        # config.json keeps the run's first configuration; each chunk logs what it changed
+        changes = {k: v for k, v in config.items() if earlier_config.get(k) != v}
+        records = RunLog.read(run_dir) if ctx.is_main else []
+        if earlier_manifest and not any(r.get("event") == "chunk" for r in records):
+            # the run's first chunk predates chunk records: rebuild its record from the manifest
+            first = next((r["step"] for r in records if r.get("event") == "step"), 0)
+            log.write({
+                "event": "chunk", "start_step": first, "retroactive": True,
+                "micro_batch": earlier_config.get("micro_batch"),
+                **{k: earlier_manifest.get(k) for k in CHUNK_KEYS},
+            })  # fmt: skip
+    else:
+        changes = {}
+        if ctx.is_main:
+            (run_dir / "config.json").write_text(
+                json.dumps(config, indent=2, sort_keys=True) + "\n"
+            )
+    if resumed_from is not None:
+        log.write({"event": "resume", "from": str(resumed_from), "step": start_step})
 
     device_name = (
         torch.cuda.get_device_name(ctx.device)
@@ -202,13 +253,21 @@ def train(cfg: TrainConfig) -> dict[str, Any]:
         else platform.processor() or "cpu"
     )
     peak = peak_for(device_name)
+    git_sha, slurm_job_id = _git_sha(), os.environ.get("SLURM_JOB_ID")
     log.manifest({
-        "run_id": run_id, "status": "running", "started": _now(), "git_sha": _git_sha(),
-        "torch": torch.__version__, "cuda": torch.version.cuda, "device": device_name,
-        "world": ctx.world, "parallel": cfg.parallel, "n_params": n_params,
+        "run_id": run_id, "status": "running",
+        "started": earlier_manifest.get("started", _now()) if continuing else _now(),
+        "git_sha": git_sha, "torch": torch.__version__, "cuda": torch.version.cuda,
+        "device": device_name, "world": ctx.world, "parallel": cfg.parallel, "n_params": n_params,
         "flops_per_token": flops_per_token, "peak_flops": peak.flops, "peak_source": peak.source,
         "grad_accum": grad_accum, "tokens_per_step": cfg.total_batch_tokens,
-        "host": platform.node(), "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
+        "host": platform.node(), "slurm_job_id": slurm_job_id,
+    })  # fmt: skip
+    log.write({
+        "event": "chunk", "start_step": start_step, "time": _now(), "micro_batch": cfg.micro_batch,
+        "config_changes": changes, "world": ctx.world, "parallel": cfg.parallel,
+        "grad_accum": grad_accum, "device": device_name, "slurm_job_id": slurm_job_id,
+        "git_sha": git_sha,
     })  # fmt: skip
 
     t_start = time.perf_counter()

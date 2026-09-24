@@ -100,6 +100,14 @@ def val_loss(
     return {"tokens": count, "val_loss": mean, "perplexity": math.exp(mean)}
 
 
+def provenance(device: torch.device) -> dict[str, Any]:
+    """Code version, device and time for an evaluation record."""
+    from gptfsdp.train import _git_sha, _now
+
+    name = torch.cuda.get_device_name(device) if device.type == "cuda" else device.type
+    return {"git_sha": _git_sha(), "device": name, "time": _now()}
+
+
 def load_run_model(run_dir: str | Path, device: torch.device) -> tuple[GPT, dict[str, Any]]:
     """A run's newest complete checkpoint in a single-process model (DCP reshards FSDP state)."""
     import torch.distributed.checkpoint as dcp
@@ -132,6 +140,7 @@ def evaluate_checkpoint(run_dir: str | Path, data_dir: str | Path, tokens: int) 
         "checkpoint": extra["checkpoint"],
         "step": extra["step"],
         **result,
+        **provenance(device),
     }
     with (Path(run_dir) / "log.jsonl").open("a") as f:
         f.write(json.dumps(record, sort_keys=True) + "\n")
@@ -173,6 +182,7 @@ def evaluate_openai_gpt2(
         "model": "openai-community/gpt2 (GPT-2 124M, MIT)",
         "weights_sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
         **result,
+        **provenance(device),
     }
     path = Path(out)
     path.parent.mkdir(parents=True, exist_ok=True)
