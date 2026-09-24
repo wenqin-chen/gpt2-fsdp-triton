@@ -24,6 +24,12 @@ Every blank is filled only from a run log (section 8).
 5. A kernel benchmark table (Triton vs eager vs `torch.compile`, forward and forward+backward,
    several shapes) plus the kernel's effect on end-to-end step time.
 
+Status 2026-09-24: all five are done (README headline, RESULTS.md). Filling the claim above from
+RESULTS.md changes two things. The full run did not use activation checkpointing; that was measured
+on one GPU as a memory/throughput trade (`cal1_mb64` vs `cal1_mb64_ac`). The kernel beats eager or
+`torch.compile` only at some shapes and slows the compiled model end to end, so the claim gives
+the measured ranges instead of a single speed-up.
+
 ## 2. Non-goals
 
 No new architecture research, no instruction tuning or RLHF, no model larger than GPT-2 medium,

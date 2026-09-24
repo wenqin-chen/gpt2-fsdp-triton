@@ -1,0 +1,11 @@
+{
+  "device": "NVIDIA H200",
+  "event": "heldout",
+  "git_sha": "7a62991d0864d095e4e8495cfb5154d0902b30be",
+  "model": "openai-community/gpt2 (GPT-2 124M, MIT)",
+  "perplexity": 26.907218199391878,
+  "time": "2026-09-24T18:57:16+00:00",
+  "tokens": 10485760,
+  "val_loss": 3.292394585162401,
+  "weights_sha256": "248dfc3911869ec493c76e65bf2fcf7f615828b0254c12b473182f0f81d3a707"
+}

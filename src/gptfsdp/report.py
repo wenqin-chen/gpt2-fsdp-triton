@@ -10,6 +10,7 @@ are listed under the table. LayerNorm benchmark files (``bench/*.json``) become 
 from __future__ import annotations
 
 import json
+import math
 import statistics
 from pathlib import Path
 from typing import Any
@@ -89,6 +90,11 @@ def summarize_run(run_dir: Path) -> dict[str, Any] | None:
         "git_sha": manifest.get("git_sha"),
         "peak_source": manifest.get("peak_source"),
     }
+
+
+def _with_se(p: float, n: int) -> str:
+    """An accuracy with its binomial standard error."""
+    return f"{p:.4f} ± {math.sqrt(p * (1 - p) / n):.4f}"
 
 
 def _fmt(value: Any, spec: str) -> str:
@@ -359,7 +365,8 @@ def write_results(
     parts.append(
         "\n## ARC-Easy (test, zero-shot, same harness for every model)\n\n"
         "Prompt `Question: …\\nAnswer:` + ` choice`; `acc_norm` picks the lowest mean token loss, "
-        "`acc` the lowest summed loss. Compare rows with each other, not with other harnesses.\n\n"
+        "`acc` the lowest summed loss; ± is the binomial standard error sqrt(p(1-p)/n). Compare "
+        "rows with each other, not with other harnesses.\n\n"
     )
     arc = [
         (f"`{r['run_id']}`", rec)
@@ -376,7 +383,7 @@ def write_results(
         for name, rec in arc:
             parts.append(
                 f"| {name} | {rec.get('checkpoint', '—')} | {rec['n']:,} | "
-                f"{rec['acc_norm']:.4f} | {rec['acc']:.4f} |\n"
+                f"{_with_se(rec['acc_norm'], rec['n'])} | {_with_se(rec['acc'], rec['n'])} |\n"
             )
     else:
         parts.append("_Not run yet._\n")
