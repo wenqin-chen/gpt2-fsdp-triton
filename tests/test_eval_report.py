@@ -129,3 +129,44 @@ def test_a_run_trained_by_several_jobs_gets_one_row_per_job(tmp_path: Path) -> N
     assert "`full` chunk 2/2 | ok | fsdp | 8 |" in text and "1,000,000" in text
     assert "SLURM job 101: 16 GPUs, micro-batch 32, steps 0–3" in text
     assert "SLURM job 202: 8 GPUs, micro-batch 64, steps 4–6" in text and "1,000 tokens" in text
+
+
+def test_the_readme_headline_is_generated_between_its_markers(tmp_path: Path) -> None:
+    from gptfsdp.report import FULL_RUN
+
+    runs, baselines = tmp_path / "runs", tmp_path / "baselines"
+    run = _fake_run(runs, FULL_RUN, 16, [1.0, 5e6, 5e6])
+    manifest = json.loads((run / "manifest.json").read_text())
+    (run / "manifest.json").write_text(json.dumps({**manifest, "tokens_per_step": 1000}))
+    with (run / "log.jsonl").open("a") as f:
+        f.write(json.dumps({"event": "heldout", "checkpoint": "step_0000003", "tokens": 4096,
+                            "val_loss": 3.0, "perplexity": 20.1}) + "\n")  # fmt: skip
+        f.write(json.dumps({"event": "arc_easy", "n": 2376, "acc": 0.5, "acc_norm": 0.45}) + "\n")
+    baselines.mkdir()
+    (baselines / "openai_gpt2_heldout.json").write_text(json.dumps(
+        {"model": "gpt2", "tokens": 4096, "val_loss": 3.3, "perplexity": 27.1}
+    ))  # fmt: skip
+    (baselines / "openai_gpt2_arc_easy.json").write_text(
+        json.dumps({"model": "gpt2", "n": 2376, "acc": 0.445, "acc_norm": 0.388})
+    )
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "# x\n\n<!-- headline:start (generated) -->\n- stale\n<!-- headline:end -->\nrest\n"
+    )
+    out = write_results(
+        runs, tmp_path / "RESULTS.md", bench_dir=tmp_path / "none", baselines=baselines,
+        readme=readme,
+    )  # fmt: skip
+    text = readme.read_text()
+    assert out["readme_headline"] and "stale" not in text and text.endswith("-->\nrest\n")
+    assert "16 GPUs for steps 0–2 at 5,000,000 tokens/s" in text and "3.0000 against 3.3000" in text
+    assert "acc_norm 0.450 against 0.388" in text and "(one epoch)" in text
+    assert "| openai-community" not in (tmp_path / "RESULTS.md").read_text()  # model name from file
+    assert "| gpt2 | — | 4,096 | 3.3000 |" in (tmp_path / "RESULTS.md").read_text()
+    readme.write_text("no markers\n")
+    assert (
+        write_results(runs, tmp_path / "R2.md", baselines=baselines, readme=readme)[
+            "readme_headline"
+        ]
+        is False
+    )

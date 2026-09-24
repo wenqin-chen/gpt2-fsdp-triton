@@ -219,9 +219,99 @@ def iterations_table(benches: list[tuple[str, dict[str, Any]]]) -> str:
     return head + body
 
 
+# The one-epoch pretraining run that the README headline describes.
+FULL_RUN = "full_fsdp_2x8"
+HEADLINE_START, HEADLINE_END = "<!-- headline:start", "<!-- headline:end -->"
+
+
+def _read_json(path: Path) -> dict[str, Any] | None:
+    return json.loads(path.read_text()) if path.is_file() else None
+
+
+def _last(records: list[dict[str, Any]], event: str) -> dict[str, Any] | None:
+    found = [r for r in records if r.get("event") == event]
+    return found[-1] if found else None
+
+
+def headline(
+    rows: list[dict[str, Any]], runs_dir: Path, baselines: Path,
+    benches: list[tuple[str, dict[str, Any]]],
+) -> str:  # fmt: skip
+    """The README summary: one bullet per result, from the same files as RESULTS.md."""
+    by_id = {r["run_id"]: r for r in rows}
+    bullets = []
+    full = by_id.get(FULL_RUN)
+    if full:
+        chunks = "; ".join(
+            f"{c['world']} GPUs for steps {c['first_step']:,}–{c['steps'] - 1:,} at "
+            f"{_fmt(c['tokens_per_s'], ',.0f')} tokens/s ({_fmt(c['mfu'], '.1%')} MFU)"
+            for c in full["chunks"]
+        )
+        done = "one epoch" if full["status"] == "ok" else f"status: {full['status']}"
+        bullets.append(
+            f"**Pretraining** ({done}): GPT-2 124M on {full['tokens_seen']:,} FineWeb-Edu tokens "
+            f"({full['steps']:,} steps of {_fmt(full['tokens_per_step'], ',')}) with FSDP2 on "
+            f"H200s: {chunks}. Final validation loss {_fmt(full['final_val_loss'], '.4f')}."
+        )
+        records = read_log(runs_dir / FULL_RUN)
+        held, arc = _last(records, "heldout"), _last(records, "arc_easy")
+        gpt2_held = _read_json(baselines / "openai_gpt2_heldout.json")
+        gpt2_arc = _read_json(baselines / "openai_gpt2_arc_easy.json")
+        if held and gpt2_held:
+            bullets.append(
+                f"**Held-out loss** on the same {held['tokens']:,} FineWeb-Edu validation tokens: "
+                f"{held['val_loss']:.4f} against {gpt2_held['val_loss']:.4f} for OpenAI's GPT-2 "
+                f"124M ({held['checkpoint']}; the run's training distribution, not GPT-2's)."
+            )
+        if arc and gpt2_arc:
+            bullets.append(
+                f"**ARC-Easy** ({arc['n']:,} test questions, zero-shot, one harness for both): "
+                f"acc_norm {arc['acc_norm']:.3f} against {gpt2_arc['acc_norm']:.3f} for GPT-2 "
+                f"124M, acc {arc['acc']:.3f} against {gpt2_arc['acc']:.3f}."
+            )
+    base, ddp = by_id.get(SCALING_BASELINE), by_id.get("cal8_ddp_mb64")
+    one, two = by_id.get("cal8_fsdp_mb64"), by_id.get("scaling_fsdp_2x8")
+    if all(r and r.get("tokens_per_s") for r in (base, ddp, one, two)):
+        assert base and ddp and one and two
+        ddp_eff = ddp["tokens_per_s"] / (ddp["world"] * base["tokens_per_s"])
+        weak = two["tokens_per_s"] / (2 * one["tokens_per_s"])
+        bullets.append(
+            f"**Scaling**: DDP on {ddp['world']} H200 at {ddp_eff:.1%} of linear "
+            f"({ddp['tokens_per_s']:,.0f} tokens/s); FSDP2 from one node to two at {weak:.1%} "
+            f"weak-scaling efficiency ({two['tokens_per_s']:,.0f} tokens/s on {two['world']} GPUs)."
+        )
+    plain, fused = by_id.get("cal1_mb64"), by_id.get("cal1_mb64_triton")
+    if benches and plain and fused and plain.get("tokens_per_s") and fused.get("tokens_per_s"):
+        kernel_rows = benches[-1][1]["rows"]
+        eager = [r["speedup_fwd_bwd_vs_eager"] for r in kernel_rows]
+        comp = [r["speedup_fwd_bwd_vs_compile"] for r in kernel_rows]
+        change = fused["tokens_per_s"] / plain["tokens_per_s"] - 1
+        bullets.append(
+            f"**Triton LayerNorm** (fused forward and backward, {len(kernel_rows)} shapes): "
+            f"{min(eager):.2f}–{max(eager):.2f}× PyTorch eager and "
+            f"{min(comp):.2f}–{max(comp):.2f}× `torch.compile` in isolation; inside the compiled "
+            "model it changes tokens/s by "
+            f"{change:+.1%} (the custom op breaks compile's own fusion), so training uses "
+            "`nn.LayerNorm`."
+        )
+    return "".join(f"- {b}\n" for b in bullets)
+
+
+def write_headline(readme: Path, text: str) -> bool:
+    """Replace the README's marked headline block; False if the markers are missing."""
+    doc = readme.read_text() if readme.is_file() else ""
+    start, end = doc.find(HEADLINE_START), doc.find(HEADLINE_END)
+    if start < 0 or end < start:
+        return False
+    body_start = doc.index("\n", start) + 1
+    readme.write_text(doc[:body_start] + text + doc[end:])
+    return True
+
+
 def write_results(
-    runs: str | Path, out: str | Path, bench_dir: str | Path = "bench"
-) -> dict[str, Any]:
+    runs: str | Path, out: str | Path, bench_dir: str | Path = "bench",
+    baselines: str | Path = "baselines", readme: str | Path | None = None,
+) -> dict[str, Any]:  # fmt: skip
     runs_dir = Path(runs)
     rows = [
         s
@@ -240,14 +330,20 @@ def write_results(
     if rows:
         sources = sorted({r["peak_source"] for r in rows if r["peak_source"]})
         parts.append("\nMFU peaks: " + "; ".join(sources) + ".\n" if sources else "")
-    parts.append("\n## Held-out loss (validation shard 0, identical tokens for every model)\n\n")
+    parts.append(
+        "\n## Held-out loss (validation shard 0, identical tokens for every model)\n\n"
+        "The validation shard is FineWeb-Edu, the distribution the runs here were trained on; "
+        "OpenAI's GPT-2 was trained on WebText. A lower loss here shows the run fits its own "
+        "distribution, not that it is the better model in general; ARC-Easy below is the check "
+        "outside the training distribution.\n\n"
+    )
     heldout = [
         (f"`{r['run_id']}`", rec)
         for r in rows
         for rec in read_log(runs_dir / r["run_id"])
         if rec.get("event") == "heldout"
     ]
-    baseline = Path("baselines/openai_gpt2_heldout.json")
+    baseline = Path(baselines) / "openai_gpt2_heldout.json"
     if baseline.is_file():
         rec = json.loads(baseline.read_text())
         heldout.append((rec["model"], rec))
@@ -271,7 +367,7 @@ def write_results(
         for rec in read_log(runs_dir / r["run_id"])
         if rec.get("event") == "arc_easy"
     ]
-    arc_baseline = Path("baselines/openai_gpt2_arc_easy.json")
+    arc_baseline = Path(baselines) / "openai_gpt2_arc_easy.json"
     if arc_baseline.is_file():
         rec = json.loads(arc_baseline.read_text())
         arc.append((rec["model"], rec))
@@ -307,4 +403,8 @@ def write_results(
         parts.append("_Not run yet._\n")
     path = Path(out)
     path.write_text("".join(parts))
-    return {"out": str(path), "n_runs": len(rows), "n_benchmarks": len(benches)}
+    summary: dict[str, Any] = {"out": str(path), "n_runs": len(rows), "n_benchmarks": len(benches)}
+    if readme is not None:
+        text = headline(rows, runs_dir, Path(baselines), benches)
+        summary["readme_headline"] = write_headline(Path(readme), text)
+    return summary

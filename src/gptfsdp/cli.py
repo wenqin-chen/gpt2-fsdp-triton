@@ -96,6 +96,10 @@ def main(argv: list[str] | None = None) -> int:
     p_rep = sub.add_parser("report", help="RESULTS.md tables from run logs")
     p_rep.add_argument("--runs", default="runs")
     p_rep.add_argument("--out", default="RESULTS.md")
+    p_rep.add_argument("--baselines", default="baselines", help="GPT-2 evaluation records")
+    p_rep.add_argument(
+        "--readme", default="README.md", help="its headline block (between markers) is rewritten"
+    )
 
     args = parser.parse_args(argv)
     if args.command == "train":
@@ -141,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         from gptfsdp.report import write_results
 
-        summary = write_results(args.runs, args.out)
+        summary = write_results(args.runs, args.out, baselines=args.baselines, readme=args.readme)
     if summary is not None:
         print(json.dumps(summary, indent=2, sort_keys=True, default=str))
     return 0

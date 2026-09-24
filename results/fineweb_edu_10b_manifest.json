@@ -1,0 +1,628 @@
+{
+  "repo_id": "HuggingFaceFW/fineweb-edu",
+  "subset": "sample-10BT",
+  "revision": "87f09149ef4734204d70ed1d046ddc9ca3f2b8f9",
+  "parquet_files": [
+    "000_00000.parquet",
+    "001_00000.parquet",
+    "002_00000.parquet",
+    "003_00000.parquet",
+    "004_00000.parquet",
+    "005_00000.parquet",
+    "006_00000.parquet",
+    "007_00000.parquet",
+    "008_00000.parquet",
+    "009_00000.parquet",
+    "010_00000.parquet",
+    "011_00000.parquet",
+    "012_00000.parquet",
+    "013_00000.parquet"
+  ],
+  "tokenizer": "tiktoken gpt2 (encode_ordinary)",
+  "eot_before_each_document": true,
+  "shard_tokens": 100000000,
+  "max_docs": 0,
+  "shards": [
+    {
+      "file": "edufineweb_val_000000.npy",
+      "split": "val",
+      "tokens": 100000000,
+      "sha256": "8e06151653328dbbd1a225bf0ab3ea902c561564c76d9fc2dc6278be8f754c0f"
+    },
+    {
+      "file": "edufineweb_train_000001.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "fb2b9eef2eab2f9903ee61ff81b5df5eb80455392e407fc3f56de8d7b6c738b5"
+    },
+    {
+      "file": "edufineweb_train_000002.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "8c4a96a209f29c2b7478e0605fe1ffa6bc06dd97af1047473f23a6f46ee03836"
+    },
+    {
+      "file": "edufineweb_train_000003.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "1b722ef4058b8ee1ab38751a246ef61f0c653fb1a5a3aa5306cadc958901daf0"
+    },
+    {
+      "file": "edufineweb_train_000004.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "fdc2f5e918bd0a40ee8e7d608e705666135646dc9b34b97687a3d730b9701692"
+    },
+    {
+      "file": "edufineweb_train_000005.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "ad68217de74552ea5afedd553276d86f42ae530e8ed5adacd204428321a8ddae"
+    },
+    {
+      "file": "edufineweb_train_000006.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "b32da8233b73304dede75fcb29526a9a7a73009a1641a2cba368eb2927c392cc"
+    },
+    {
+      "file": "edufineweb_train_000007.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "f57ac6df4f034e594c771206293622e26e22a5d843fba44a921b48fc7d3b9d03"
+    },
+    {
+      "file": "edufineweb_train_000008.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "e85392e45f5038e8652512e0544c79f31d07fb6a873cd3f059472370ed0a62df"
+    },
+    {
+      "file": "edufineweb_train_000009.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "63fe62ac10a2273b2f438d39f3183706629d924fd2b9e5cd9368726699bc73d2"
+    },
+    {
+      "file": "edufineweb_train_000010.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "c83d319ea91245269dffe14969a93a0106e28100d45bacab2252d4febcc97137"
+    },
+    {
+      "file": "edufineweb_train_000011.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "6bc97d22ade94c1d593595282a718a36921055b92036a8f8355d4a4774e3b053"
+    },
+    {
+      "file": "edufineweb_train_000012.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "f4e4a2149deb470dcc11ebef0d53b5d8e3b3c2483c15685df95a84ccae63d8b1"
+    },
+    {
+      "file": "edufineweb_train_000013.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "d947956f7e3a9fcca972fb668b0b47fee9c389bf087142417c3d02ac77592aa1"
+    },
+    {
+      "file": "edufineweb_train_000014.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "912e7180f9719f4142ed3df06df1de34e79f6df2a291145ab83a8e01dcef6bd0"
+    },
+    {
+      "file": "edufineweb_train_000015.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "4765cb4af744b8b592bc432d98069229950a490474ac375fe35b586348b14330"
+    },
+    {
+      "file": "edufineweb_train_000016.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "e6ba6f0cdfb83bf9bd1a8f6cfd102a33c09f9fd232949a55541cacc73f6d0909"
+    },
+    {
+      "file": "edufineweb_train_000017.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "98d976bb4a63288640e8588fb37251e67e7daa1c22f0db84731ecd68df995508"
+    },
+    {
+      "file": "edufineweb_train_000018.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "cb62b457092ceddd56fa2743ec5baade5dc12aaac36536c0240f403f72595c31"
+    },
+    {
+      "file": "edufineweb_train_000019.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "9e0c740cedf24bfc8ea3dc58d54db2a7fa3af56fea5eca6c29aa1f42d2bf0069"
+    },
+    {
+      "file": "edufineweb_train_000020.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "ce07905923080df6395cfc4128b386e36c008ad1afdd05323bcb817868d27b16"
+    },
+    {
+      "file": "edufineweb_train_000021.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "10098ae1ab6d70815cad32588879370f927aed8e8e6c76df9df04c36a886ef6e"
+    },
+    {
+      "file": "edufineweb_train_000022.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "e8a7c0a75240e658f69cd6fc949526b687803c868f8ec804c34449a748182a4c"
+    },
+    {
+      "file": "edufineweb_train_000023.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "8168df26559cd616713b2b09b629e55e6c8e650442f211ec1d3f2cf8ade19f4c"
+    },
+    {
+      "file": "edufineweb_train_000024.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "c8eadea353f5e1604270ec507c77e0678cd022d15f7bb9e5a834ed4fcd851371"
+    },
+    {
+      "file": "edufineweb_train_000025.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "2e4de6ed1d27f993b458e9e8fc7e47dadd156afbd6af271aa94fc3cecaa3f56d"
+    },
+    {
+      "file": "edufineweb_train_000026.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "654cd9305bdb59180055cc83eaeca3779e8dc9cd8c312fc38714561fe5920cce"
+    },
+    {
+      "file": "edufineweb_train_000027.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "715a33cafee684f4e52530d67666ef1b16f5a1119c14a4c8e6f73c8cda4491b1"
+    },
+    {
+      "file": "edufineweb_train_000028.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "9f5c17f66c1fe7b232b9daa3bea642f43df16d8a999495309a71a802d6907ade"
+    },
+    {
+      "file": "edufineweb_train_000029.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "54b3e2e1822a5f663eba20cf1f83188211229f594725a03aeb8d8920323f4fe3"
+    },
+    {
+      "file": "edufineweb_train_000030.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "e4ce888dd385dfeec688c43ddacf84b52ddf96291fcb5e6a045adcba7698ed82"
+    },
+    {
+      "file": "edufineweb_train_000031.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "a78cf56f1fbae0c598e142e0239513ccc9b6a39766fa42a5b3915a1589d60e1c"
+    },
+    {
+      "file": "edufineweb_train_000032.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "85a5eee54bfe03e0a87cd9877513e6bf2a6a0cb2d790e2af077aade3e57dbb97"
+    },
+    {
+      "file": "edufineweb_train_000033.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "d78f711bc7e02e55e2a3450c9b6d390c44fdffc43cb206a91ae475c734dce4fd"
+    },
+    {
+      "file": "edufineweb_train_000034.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "9f679cd229767b12c510404b5f262440fad88d7b2fb781247ee154b5f5028ab8"
+    },
+    {
+      "file": "edufineweb_train_000035.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "5e8ec5aad9a899d3cf702efb96f43b089e97ba840b63204bcbc5b4c9540fbe59"
+    },
+    {
+      "file": "edufineweb_train_000036.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "3d276457967e9603f22ef5ddafd0e0554dbec3738bc0ac07a7d1baa0b84735ef"
+    },
+    {
+      "file": "edufineweb_train_000037.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "4aabd74f829bebd938d033b985d96221ea44351b9d4efac8a0f3e0cfaa8328f6"
+    },
+    {
+      "file": "edufineweb_train_000038.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "c423f958d67718d1124ad1c1c437e718832dae258398c19626cd813485f12992"
+    },
+    {
+      "file": "edufineweb_train_000039.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "c92b3eaebd153fbe4b39440968bf32d12e84d920d954b53806fbe15e1829a871"
+    },
+    {
+      "file": "edufineweb_train_000040.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "fcaabf9f2cb363f03d1daababa5f480da8d3c1c5d1ae02f81a1f0a45a093d664"
+    },
+    {
+      "file": "edufineweb_train_000041.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "bf2133e93b97bda0d1e619751031ce007c0fc5e3718c2d31ddf510a49eade69f"
+    },
+    {
+      "file": "edufineweb_train_000042.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "0c5a9f31d71d33dda9f5bb0636387da2d09d2d8bf1adead17beb2177e3d796e6"
+    },
+    {
+      "file": "edufineweb_train_000043.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "351aaa383a685280e74da7f273bb2b4794e4c4b70c30d046676701012fa9f23f"
+    },
+    {
+      "file": "edufineweb_train_000044.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "ae90a752bf61a931d31554b59cec09d09a63cf388c9b5388860ab0e1b37c74fa"
+    },
+    {
+      "file": "edufineweb_train_000045.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "0e2e870c15e88101e91acb4e94b2a02fa38956cfffa39f85bf6099dcc9d72977"
+    },
+    {
+      "file": "edufineweb_train_000046.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "895d9f1a44ae07242f3f4496e45efab8931a1a975d28de69e4494013dfd193bc"
+    },
+    {
+      "file": "edufineweb_train_000047.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "32bf7fca1cce2c24fe40a5d0979a3f1e5e995e04eaebc0c1f38e05e6086d1c81"
+    },
+    {
+      "file": "edufineweb_train_000048.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "35bf157022f4336684b575d7e5830ec5b211bff9c051b2cfb764b20489b296e2"
+    },
+    {
+      "file": "edufineweb_train_000049.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "ea328335203e359ef0695c0d48a98893f0a5dd325589047060cc1e26e293e682"
+    },
+    {
+      "file": "edufineweb_train_000050.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "e87b16801b169eb14b47d2ad401d617d20c07a7ef5c00cb5f72dd4a874eedfdc"
+    },
+    {
+      "file": "edufineweb_train_000051.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "5c4c2d96f6a9e5da82d28878afde7d9ee8548e7b84ab63a82be7b3420d6b4345"
+    },
+    {
+      "file": "edufineweb_train_000052.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "c308912c7d689a73f85cfc0af7faa8807a020f95216b03e4d7a33d7ebb115a64"
+    },
+    {
+      "file": "edufineweb_train_000053.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "0fc9f13042b6a2f8dba9568d2a06163fa1de98c94d554c4cadf989a4201b228d"
+    },
+    {
+      "file": "edufineweb_train_000054.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "2b9712c125b9f73517eb268e82d6f4d0c0d5e0c87cb9641d85dee35706e19ff3"
+    },
+    {
+      "file": "edufineweb_train_000055.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "c08a2f0be5368f851bf75d4bf5fd304d6a348e963f906ad6fe7befaacf107531"
+    },
+    {
+      "file": "edufineweb_train_000056.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "a24ee5d941cde10a076eadf1991c505723e3fcabad0ca44c59597fbd59cc00b4"
+    },
+    {
+      "file": "edufineweb_train_000057.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "62df0eaaa9149dd57d0d46d5f417b3ac7932f66976d2409cb6b96afc4d028c00"
+    },
+    {
+      "file": "edufineweb_train_000058.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "8889070c06572dc1ce605454346bce8b30d0c75a926a695ff411217af7b21515"
+    },
+    {
+      "file": "edufineweb_train_000059.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "eeb34c5705547bbac1c17fed12804a558d58d0825e71cb5e20c140b1c501e15b"
+    },
+    {
+      "file": "edufineweb_train_000060.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "a9f3339ea79ad49392621eb9f35b4959864a803a19fa67435ec7bce64a88f1d8"
+    },
+    {
+      "file": "edufineweb_train_000061.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "81d88d1cc94aa81f6fb2dae54e0196e5e6c34f06e8d2864dbb5485c3a9ac3916"
+    },
+    {
+      "file": "edufineweb_train_000062.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "6c33f90a9d0edbb0dc38ace146aff11ca647079834f29d95045edac207742194"
+    },
+    {
+      "file": "edufineweb_train_000063.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "ccb44b1521db0a860524152751314fc43d09c97ba5097585506a397e2bfa47dc"
+    },
+    {
+      "file": "edufineweb_train_000064.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "1c4191f36fea9ec361da3f3fd16ce29f98465ade56e475429dfaaed1780a0d36"
+    },
+    {
+      "file": "edufineweb_train_000065.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "9fbc0519b2fd44111c19e247dd35d9c15debe6824021d674b369526277f6631e"
+    },
+    {
+      "file": "edufineweb_train_000066.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "ad8230e44c6972dd647523a749c13a0d90251f7796e5a93317b147ddad7d181c"
+    },
+    {
+      "file": "edufineweb_train_000067.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "13f2b3bf4f5677310a0d8d928a08940d6fce4168c37c7d5a246e79da9967900d"
+    },
+    {
+      "file": "edufineweb_train_000068.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "d7acb2955b86fc402c3feb817e35e208846fbe0ef8bae2c8a6ae207d6ac34014"
+    },
+    {
+      "file": "edufineweb_train_000069.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "b38a292973a6914c334a30593627948311e1b661c6a31e3056745cd4963fbf1e"
+    },
+    {
+      "file": "edufineweb_train_000070.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "6ee5d999970f4e8e6745f98494b4fcf024cfe84db1ef22668f759381a2404b4b"
+    },
+    {
+      "file": "edufineweb_train_000071.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "510b6398f8dd28b0168a52123aebc0c23e196938640d592972eee12bc9cda41b"
+    },
+    {
+      "file": "edufineweb_train_000072.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "42fb1038ef572ee64b52b4053d49a3488a6cbfa7a5eb36df463741733978bd49"
+    },
+    {
+      "file": "edufineweb_train_000073.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "a888d770b580077f5a460e85084e899e26af2b4eb0225fc115556023581b1ee0"
+    },
+    {
+      "file": "edufineweb_train_000074.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "9a63ac94b630143b0620ed0af725075cb68fd698817c3d63f1f50cb14a8d9a24"
+    },
+    {
+      "file": "edufineweb_train_000075.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "e5b3ac1070cb8ec0f2ba5da2923f97518579044b048add5a5596fd4288e6d8bf"
+    },
+    {
+      "file": "edufineweb_train_000076.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "3d57e4b4e948e05723b5920d80ad675905a7b0e874a9d96ab461608b650d5f41"
+    },
+    {
+      "file": "edufineweb_train_000077.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "200479354ff129162d8a16a2f9b61b38a246e362bae423236f33744ce4135a9d"
+    },
+    {
+      "file": "edufineweb_train_000078.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "f6b3c6bc992a4a2805a311920b4c106d9f7278b4b483d3d74a4d8532ed96737c"
+    },
+    {
+      "file": "edufineweb_train_000079.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "944fb1d015c8d4df556125a63833509849d35146ecdae181437348a99e279d45"
+    },
+    {
+      "file": "edufineweb_train_000080.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "c69a74bf1a1013684eae3f56266ffd7effef3ad497e1c29a8944e46f582d5811"
+    },
+    {
+      "file": "edufineweb_train_000081.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "42c459999fbddf7f756dd3d79578cd01969d68658b3ce3e2a7e1bcf15de41c90"
+    },
+    {
+      "file": "edufineweb_train_000082.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "55f392535a922d939a4ea0a9eb995815af8fc2f4c5e429661ba8ce735b6954c1"
+    },
+    {
+      "file": "edufineweb_train_000083.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "a154d13a5b58f86f10bd636fd5e5be35e46eab10b771cb3777e88b6f695e323f"
+    },
+    {
+      "file": "edufineweb_train_000084.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "5a80cbefd3238d68c8e8c25d0daec8f0e7b4406cf4f8eda1ed67a7de8d484615"
+    },
+    {
+      "file": "edufineweb_train_000085.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "97c2c599154914414e0b1abc166bca69928d6ebe1fa5f834d8b16857a2426f3a"
+    },
+    {
+      "file": "edufineweb_train_000086.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "b75fb494e43504f5e7264bd487690687d42110d9bff725f79ce6966879ddd883"
+    },
+    {
+      "file": "edufineweb_train_000087.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "c32bbd633ee87a53ffc4bd817b28da871a047a7ed522def70873b20e0bb00d50"
+    },
+    {
+      "file": "edufineweb_train_000088.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "7f0a88c0ff24607a54c42206d116c9b097e9dc6e9076e4a23ab29078502442a4"
+    },
+    {
+      "file": "edufineweb_train_000089.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "637dc99d5a06800b9a82095f9df39e54d27d72ead965dbe41ef6a6fa53dbb77c"
+    },
+    {
+      "file": "edufineweb_train_000090.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "9fb8e2545326f922452e0f343f3d5fb252c33f6a643f4b59592ae4f0975f3d98"
+    },
+    {
+      "file": "edufineweb_train_000091.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "f6d661aad1ffcf140066c38e3e72b6410f2030dc4abbf7c01f36fa7a541e076d"
+    },
+    {
+      "file": "edufineweb_train_000092.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "6902f4078eebc4afab30b13fde4721ba23078c85cdd4e73b813ab17b6e5b0a79"
+    },
+    {
+      "file": "edufineweb_train_000093.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "7da678bd27d0ba46a13b20cee9d9c45da485f4f660c4a9014fcb3331dc5189f8"
+    },
+    {
+      "file": "edufineweb_train_000094.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "b5af695e128036779d4893c5cde2dc2a0d602885d3e7cce6f124253dff7e9bd0"
+    },
+    {
+      "file": "edufineweb_train_000095.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "7d0e939df573d6e91812d210a8acc5e65c62582f84fafe18fce720514cfe92b2"
+    },
+    {
+      "file": "edufineweb_train_000096.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "ebe15fb4f61678344e2b65b52a9202cfbe96f626806981ad914007407d251a55"
+    },
+    {
+      "file": "edufineweb_train_000097.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "e7d5fe9aa9f3c77350534f4563f2bcb423e6fb637f233f33e7da8df184488abf"
+    },
+    {
+      "file": "edufineweb_train_000098.npy",
+      "split": "train",
+      "tokens": 100000000,
+      "sha256": "156ffa52d5614e05bd0ed5c8fd13d83f417ebd3e19d9e05d94107af9914d849d"
+    },
+    {
+      "file": "edufineweb_train_000099.npy",
+      "split": "train",
+      "tokens": 53989344,
+      "sha256": "fa8e9942511394369dae0635be3b44bb5cfafec0b229e64d9252e00e7927b308"
+    }
+  ],
+  "total_tokens": 9953989344
+}
