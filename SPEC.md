@@ -117,6 +117,15 @@ two-node jobs backfilled within hours. So the full run is 2 nodes x 8 H200 with 
 resumable 30-min chunks (`slurm/full_run_2node.sbatch`), and each 8-GPU calibration configuration
 is its own 10-min job. Single-GPU work uses the free `debug` QOS (1 GPU, 1 h).
 
+The first chunk reached step 15,251 of 18,722; the second two-node chunk then waited days in the
+queue. The remaining steps therefore go to `slurm/finish.sbatch`, queued in two shapes at once
+(one node with a 20-min wall, two nodes with a 16-min wall); whichever starts first finishes the
+run and evaluates it, and cancels the other. On one node the per-GPU micro-batch doubles (64
+instead of 32), so every step still has 524,288 tokens, and DCP reshards the 16-rank checkpoint
+onto 8 ranks. Each job logs a `chunk` record, and RESULTS.md gives one row per chunk, because
+tokens/s depends on the GPU count. Only a run's first job writes `config.json`; later jobs
+record what they changed.
+
 Original options:
 
 | Option | Hardware | Notes |
@@ -133,5 +142,6 @@ single-GPU work (≈ $1), DDP/FSDP calibration runs on one node (≈ $4), the fu
 CPU (CI): model shapes and parameter count (124.4M with tied embeddings), loss decreases on a tiny
 config, data-loader determinism and resume, MFU arithmetic, learning-rate schedule, HellaSwag
 scoring on a two-item fixture, 2-process gloo DDP and FSDP steps match a single-process step,
-checkpoint save/resume reproduces the uninterrupted loss. GPU tests (`-m gpu`, run on the
+checkpoint save/resume reproduces the uninterrupted loss, a later chunk with half the micro-batch
+(twice the accumulation) matches it too, and resuming a finished run changes nothing. GPU tests (`-m gpu`, run on the
 cluster): Triton LayerNorm forward/backward against PyTorch, bf16 autocast step.

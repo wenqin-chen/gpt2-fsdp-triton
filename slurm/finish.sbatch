@@ -30,12 +30,14 @@ evaluated() {
   logged heldout && logged arc_easy &&
     [ -f baselines/openai_gpt2_heldout.json ] && [ -f baselines/openai_gpt2_arc_easy.json ]
 }
-others() { squeue --me --name="$SLURM_JOB_NAME" -h -o "%i %T %S" | awk -v me="$SLURM_JOB_ID" '$1 != me'; }
+# (queue lookups fail open: without squeue this job simply does the work)
+others() { squeue --me --name="$SLURM_JOB_NAME" -h -o "%i %T %S" 2>/dev/null | awk -v me="$SLURM_JOB_ID" '$1 != me'; }
 
 # another copy that started earlier (or in the same second with a lower job id) is the one working
-mine=$(squeue -j "$SLURM_JOB_ID" -h -o %S)
+mine=$(squeue -j "$SLURM_JOB_ID" -h -o %S 2>/dev/null || true)
 while read -r id state start; do
   case $state in RUNNING | CONFIGURING) ;; *) continue ;; esac
+  [ -n "$mine" ] || continue
   if [[ $start < $mine || ($start == "$mine" && $id -lt $SLURM_JOB_ID) ]]; then
     echo "job $id is already finishing $RUN_NAME; nothing to do"
     exit 0
@@ -44,7 +46,7 @@ done < <(others)
 echo "finishing $RUN_NAME on $SLURM_JOB_NODELIST git=$(git describe --always --dirty)"
 
 if [ ! -f "$final" ]; then
-  per_node=${SLURM_GPUS_ON_NODE:-$(tr , '\n' <<<"$CUDA_VISIBLE_DEVICES" | wc -l)}
+  per_node=$((${SLURM_GPUS_ON_NODE:-$(nvidia-smi -L | wc -l)}))
   micro=$((524288 / 1024 / (SLURM_NNODES * per_node)))
   ((micro > 64)) && micro=64
   head_node=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
@@ -57,7 +59,8 @@ fi
 
 if [ -f "$final" ] && ! evaluated; then
   # two GPUs of this node: the run's evaluations (they append to its log) on one, GPT-2's on the other
-  read -r gpu_a gpu_b _ <<<"${CUDA_VISIBLE_DEVICES//,/ }"
+  devices=${CUDA_VISIBLE_DEVICES:-0,1}
+  read -r gpu_a gpu_b _ <<<"${devices//,/ }"
   (
     export CUDA_VISIBLE_DEVICES=$gpu_a
     logged heldout || py heldout --run "$run" --data "$DATA_DIR" --tokens 10485760
@@ -77,6 +80,6 @@ if [ -f "$final" ] && ! evaluated; then
 fi
 
 if evaluated; then
-  others | awk '$2 == "PENDING" {print $1}' | xargs -r scancel
+  others | awk '$2 == "PENDING" {print $1}' | xargs -r scancel || true
   echo "$RUN_NAME is complete and evaluated"
 fi
