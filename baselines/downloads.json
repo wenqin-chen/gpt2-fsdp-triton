@@ -1,0 +1,13 @@
+{
+  "arc_easy_test": {
+    "path": "data/evals/ai2_arc/ARC-Easy/test-00000-of-00001.parquet",
+    "revision": "210d026faf9955653af8916fad021475a3f00453",
+    "sha256": "4160597d618ae851c7eb04e281574f3f654776216ac6b6641588d64527b47177"
+  },
+  "gpt2": {
+    "path": "data/evals/gpt2/model.safetensors",
+    "repo_id": "openai-community/gpt2",
+    "revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
+    "sha256": "248dfc3911869ec493c76e65bf2fcf7f615828b0254c12b473182f0f81d3a707"
+  }
+}
